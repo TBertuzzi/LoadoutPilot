@@ -1,0 +1,127 @@
+# Changelog
+
+## 1.0.0 - 2026-08-24
+
+First stable public release.
+
+- Promoted the tested 0.1.10 feature set to stable 1.0.0.
+- Finalized public README, CurseForge description, release notes, and publishing instructions.
+- Added a project support page and Buy Me a Coffee link: `https://buymeacoffee.com/bertuzzi`.
+- Preserved robust PvP -> World recovery for talents and equipment.
+- Preserved adaptive HUD, custom minimap button, language selector, optional chat notifications, and manual automation indicators.
+
+## 0.1.10 - 2026-08-24
+
+PvP exit talent-switch reliability fix.
+
+- Fixed talent loadouts getting stuck on `Applying...` after leaving PvP.
+- Added automatic out-of-combat retries for pending talent changes, matching the equipment retry behavior.
+- Added a guarded talent-switch watcher with a `LoadConfig` fallback when Blizzard's saved-loadout delegate does not confirm the change.
+- Synced pending talent completion from Blizzard talent update events.
+- Corrected saved-loadout detection to compare saved loadout IDs instead of the live working ActiveConfig ID.
+
+## 0.1.9 - 2026-08-24
+
+Pre-release quality-of-life update.
+
+- Added configurable chat notifications, enabled by default.
+- Disabling chat notifications suppresses routine automatic talent/gear switch messages while preserving explicit command output and configuration confirmations.
+- Added a Restore Positions button that resets both the status HUD and minimap-button position.
+- `/lpilot resetpos` now restores both positions as well.
+- The status HUD now marks talents and/or equipment as `(MANUAL)` when the corresponding automatic switch option is disabled.
+- Preserved all language, adaptive HUD, minimap, and PvP transition fixes from 0.1.8.
+
+## 0.1.8 - 2026-08-24
+
+Language selector update.
+
+- Added the same language-selection model used by DK Mentor.
+- Added **Automatic (WoW)**, **Portuguese (Brazil)**, and **English** options.
+- Automatic mode follows the WoW client language and falls back to English for unsupported locales.
+- Added a language button to the main Loadout Pilot window.
+- Added a modal language picker with the current selection highlighted.
+- Added `/lpilot language auto|ptbr|en` plus `lang` and `idioma` aliases.
+- Language preference is stored per character and is applied after `/reload`.
+
+## 0.1.7 - 2026-08-24
+
+Minimap rim positioning fix.
+
+- Reworked the minimap-button geometry using the proven DK Mentor implementation.
+- Removed the fixed 78px orbit radius; the orbit now follows the actual minimap width and height.
+- Added an outer offset so the button center stays just beyond the minimap edge.
+- Removed screen clamping that could push the button back into the minimap.
+- Matched Blizzard/LibDBIcon-style border, background, icon, and highlight geometry.
+- Added automatic repositioning when Edit Mode resizes the minimap.
+- Minimap dragging now matches DK Mentor: drag directly around the rim.
+- Updated manual packaging scripts to include the custom Media icon.
+
+## 0.1.6 - 2026-08-24
+
+Custom minimap icon update.
+
+- Replaced the generic minimap button texture with a custom Loadout Pilot icon.
+- Added the new icon asset under `Media/MinimapIcon.tga`.
+- Kept the current minimap behavior: left-click to open, right-click to apply, and Shift + drag to move around the minimap.
+
+## 0.1.5 - 2026-08-24
+
+Inline inspired HUD update.
+
+- Restyled the HUD to a slimmer single-row presentation inspired by the reference layout.
+- Added a more transparent background treatment.
+- The HUD now presents: specialization icon, talents, equipment, and current status inline.
+- The HUD automatically expands to the right and falls back to a second line when text becomes too long.
+- Context, class, and specialization remain available in the hover tooltip.
+
+## 0.1.4 - 2026-08-24
+
+Adaptive HUD sizing update.
+
+- Removed the large unused empty space on the status HUD.
+- The HUD now resizes dynamically to fit the current text content.
+- Short text keeps the HUD compact.
+- Longer text can expand the HUD to the right up to a safe maximum width.
+- Very long text wraps and expands the HUD downward when needed.
+
+## 0.1.3 - 2026-08-24
+
+PvP exit equipment recovery fix.
+
+- Fixed an issue where equipment could remain on the PvP set after returning to World content.
+- Added automatic retry for pending equipment swaps outside combat when WoW temporarily rejects the first request during a loading/context transition.
+- Equipment swaps are now considered complete only after the currently mapped set is confirmed equipped; a stale `EQUIPMENT_SWAP_FINISHED` event from the previous context can no longer clear the new target.
+- Added PvP completion/battlefield status events as extra context refresh signals.
+- Reset the retry cadence whenever the target equipment set is confirmed or the mapping changes.
+
+## 0.1.2 - 2026-08-24
+
+Minimap button update.
+
+- Added a minimap button for quick access to Loadout Pilot.
+- Left-click toggles the main window.
+- Right-click applies the currently mapped loadout immediately.
+- Shift + drag moves the button around the minimap.
+- Added a settings toggle to show or hide the minimap icon.
+
+## 0.1.1 - 2026-08-24
+
+HUD refinement update.
+
+- Reduced the status HUD footprint for a less intrusive presentation.
+- Reduced the specialization icon from 46x46 to 24x24.
+- Simplified the HUD title to show only the current context.
+- Added hover tooltip details for class, specialization, context, talents, gear, and status.
+
+## 0.1.0 - 2026-08-24
+
+Initial beta.
+
+- Added generic support for every Retail class and specialization.
+- Added automatic context detection for World, Delve, Dungeon, Mythic+, Raid, and PvP.
+- Added per-spec/per-context mapping of saved Blizzard talent loadouts.
+- Added per-spec/per-context mapping of saved Blizzard equipment sets.
+- Added automatic talent and gear switching with combat-safe queuing.
+- Added manual Apply fallback.
+- Added movable class/spec/context status HUD.
+- Added English and Brazilian Portuguese localization.

@@ -1,0 +1,20 @@
+package-as: LoadoutPilot
+manual-changelog: CHANGELOG.md
+license-output: LICENSE.txt
+ignore:
+  - .editorconfig
+  - .github
+  - .gitignore
+  - .luacheckrc
+  - .pkgmeta
+  - CURSEFORGE_DESCRIPTION.md
+  - CURSEFORGE_SUBMISSION.md
+  - PUBLISHING.md
+  - README.md
+  - TESTING.md
+  - VALIDATION_REPORT.md
+  - scripts
+  - tests
+  - SUPPORT.md
+  - RELEASE_NOTES_v1.0.0.md
+  - branding
