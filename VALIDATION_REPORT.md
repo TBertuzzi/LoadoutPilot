@@ -1,21 +1,22 @@
-# Validation Report — Loadout Pilot 0.1.10
+# Validation Report — Loadout Pilot 1.1.1
 
 Date: 2026-08-24
 
 ## Completed checks
 
-- Confirmed Retail 12.1.0 / Interface 120100 metadata in `LoadoutPilot.toc`.
-- Confirmed matching version `0.1.10` in `LoadoutPilot.toc` and `Data.lua`.
-- Static validation passed for required implementation markers.
-- Executed the Lua smoke test successfully with `texlua`.
-- Confirmed PvP-exit equipment retry remains implemented.
-- Added equivalent out-of-combat retry behavior for pending talent loadouts.
-- Added `StartPendingTalentWatch` to verify saved-loadout selection after a switch request.
-- Added guarded `LoadConfig` fallback when `SwitchToLoadoutByIndex` does not confirm during transition.
-- Added completion handling for `TRAIT_CONFIG_UPDATED` plus additional talent-related events.
-- Changed selected-loadout detection to prefer `GetLastSelectedSavedConfigID`, matching the proven DK Mentor approach.
-- Smoke test simulated a transient PvP-exit talent-edit rejection, a saved-loadout delegate that fails to confirm on the first attempt, and a transient equipment rejection; both mappings recovered and the HUD left `Applying...`.
+- Confirmed Retail 12.1.0 / Interface 120100 metadata.
+- Confirmed version 1.1.1 and schema 2.
+- Confirmed v1.0/v1.1 mappings and dungeon overrides remain compatible.
+- Confirmed assigned group-role detection through `UnitGroupRolesAssigned("player")`.
+- Confirmed specialization role detection through `GetSpecializationRoleByID` with spec-list fallback.
+- Confirmed same-role specialization changes remain automatic.
+- Confirmed cross-role specialization changes are blocked in Dungeon, Mythic+, Raid, and PvP when they conflict with the protected role.
+- Confirmed World and Delve cross-role changes remain unrestricted.
+- Confirmed role labels are exposed in specialization pickers, main UI, and HUD tooltip.
+- Confirmed `PLAYER_ROLES_ASSIGNED` triggers rule reevaluation.
+- Confirmed existing specialization -> talents -> equipment sequencing remains intact.
+- Confirmed existing PvP -> World restoration coverage remains present.
 
-## Important limitation
+## Live-client note
 
-The automated smoke test uses a mocked WoW API environment. The PvP transition still needs one live-client verification because Blizzard can expose brief protected/transitional states that mocks cannot reproduce exactly.
+The mocked Lua tests validate the rule logic, but live-client verification is still recommended because Blizzard can restrict specialization changes based on current game state.

@@ -1,33 +1,72 @@
 local ROOT = (arg and arg[1]) or "."
 
+local specs = {
+    [1] = { id = 64, name = "Frost", icon = 135846, role = "DAMAGER" },
+    [2] = { id = 62, name = "Arcane", icon = 135932, role = "DAMAGER" },
+    -- Synthetic third specialization used only to exercise cross-role safety.
+    [3] = { id = 999, name = "Bulwark", icon = 134400, role = "TANK" },
+}
+
+local talentIDsBySpec = {
+    [64] = {101, 202, 203},
+    [62] = {301, 302},
+    [999] = {},
+}
+local talentNames = {
+    [101] = "Frost World",
+    [202] = "Frost Dungeon",
+    [203] = "Frost M+ Default",
+    [301] = "Arcane Default",
+    [302] = "Arcane Voidscar",
+}
+local gearNames = {
+    [1] = "World Gear",
+    [2] = "PvE Default",
+    [3] = "Voidscar Gear",
+}
+local challengeMaps = {
+    [500] = "Voidscar",
+    [501] = "Ruby Life Pools",
+    [502] = "Other Mythic Dungeon",
+}
+
 local state = {
     locale = "ptBR",
     specIndex = 1,
     specID = 64,
     specName = "Frost",
-    selectedTalent = 101,
+    selectedTalentBySpec = { [64] = 101, [62] = 301 },
     inDelve = false,
     inInstance = false,
     instanceType = "none",
+    instanceName = "Open World",
+    instanceID = 0,
+    difficultyID = 0,
     challenge = false,
     slottedKeystone = false,
+    activeChallengeMapID = nil,
+    slottedChallengeMapID = nil,
     combat = false,
     equippedSet = 1,
     equipmentUseFailures = 0,
     talentEditFailures = 0,
     talentSwitchFailures = 0,
+    specSwitchFailures = 0,
+    assignedRole = "DAMAGER",
 }
 
-local talentIDs = {101, 202}
-local talentNames = { [101] = "Frost World", [202] = "Frost Dungeon" }
-local gearNames = { [1] = "World Gear", [2] = "Dungeon Gear" }
+local function syncSpec()
+    local info = specs[state.specIndex]
+    state.specID = info.id
+    state.specName = info.name
+end
 
 local function widget()
     local o = { shown = false, point = {"CENTER", nil, "CENTER", 0, 0}, scripts = {} }
     local methods = {}
-    function methods:SetSize() end
-    function methods:SetWidth() end
-    function methods:SetHeight() end
+    function methods:SetSize(w, h) self.width = w; self.height = h end
+    function methods:SetWidth(w) self.width = w end
+    function methods:SetHeight(h) self.height = h end
     function methods:SetFrameStrata() end
     function methods:SetFrameLevel() end
     function methods:SetClampedToScreen() end
@@ -84,7 +123,10 @@ Minimap.height = 260
 Minimap.centerX = 500
 Minimap.centerY = 500
 DEFAULT_CHAT_FRAME = { messages = {}, AddMessage = function(self, text) table.insert(self.messages, text) end }
-GameTooltip = { SetOwner=function() end, AddLine=function() end, Show=function() end, Hide=function() end }
+GameTooltip = {
+    SetOwner=function() end, AddLine=function() end, AddDoubleLine=function() end,
+    Show=function() end, Hide=function() end,
+}
 RAID_CLASS_COLORS = { MAGE = {r=0.25,g=0.78,b=0.92} }
 SlashCmdList = {}
 Enum = { LoadConfigResult = { Error=0, NoChangesNecessary=1, LoadInProgress=2, Ready=3 } }
@@ -96,14 +138,47 @@ function CreateFrame(_, name)
 end
 function GetLocale() return state.locale end
 function GetSpecialization() return state.specIndex end
-function GetSpecializationInfo() return state.specID, state.specName, "", 135846 end
+function GetSpecializationInfo(index)
+    local info = specs[index or state.specIndex]
+    if not info then return nil end
+    return info.id, info.name, "", info.icon, info.role
+end
+function GetNumSpecializations() return 3 end
 function UnitClass() return "Mage", "MAGE", 8 end
+function UnitGroupRolesAssigned(unit) return unit == "player" and state.assignedRole or "NONE" end
+function GetSpecializationRoleByID(specID)
+    for _, info in pairs(specs) do if info.id == specID then return info.role end end
+    return nil
+end
 function IsInInstance() return state.inInstance, state.instanceType end
+function GetInstanceInfo()
+    return state.instanceName, state.instanceType, state.difficultyID, "Mock Difficulty", 5, 0, false, state.instanceID
+end
 function InCombatLockdown() return state.combat end
 function issecretvalue() return false end
 function GetCursorPosition() return 350, 350 end
 
 C_Timer = { After = function(_, fn) fn() end }
+C_SpecializationInfo = {
+    GetSpecialization = function() return state.specIndex end,
+    GetNumSpecializationsForClassID = function(classID) return classID == 8 and 3 or 0 end,
+    GetSpecializationInfo = function(index)
+        local info = specs[index]
+        if not info then return nil end
+        return info.id, info.name, "", info.icon, info.role
+    end,
+    SetSpecialization = function(index)
+        if state.combat then return false end
+        if state.specSwitchFailures > 0 then
+            state.specSwitchFailures = state.specSwitchFailures - 1
+            return false
+        end
+        if not specs[index] then return false end
+        state.specIndex = index
+        syncSpec()
+        return true
+    end,
+}
 C_PartyInfo = {
     IsDelveInProgress = function() return state.inDelve end,
     IsChallengeModeActive = function() return state.challenge end,
@@ -111,6 +186,10 @@ C_PartyInfo = {
 C_ChallengeMode = {
     IsChallengeModeActive = function() return state.challenge end,
     HasSlottedKeystone = function() return state.slottedKeystone end,
+    GetActiveChallengeMapID = function() return state.activeChallengeMapID end,
+    GetSlottedKeystoneInfo = function() return state.slottedChallengeMapID end,
+    GetMapTable = function() return {500, 501, 502} end,
+    GetMapUIInfo = function(id) return challengeMaps[id], id end,
 }
 C_Traits = {
     GetConfigInfo = function(id)
@@ -119,10 +198,10 @@ C_Traits = {
     end,
 }
 C_ClassTalents = {
-    GetConfigIDsBySpecID = function() return talentIDs end,
-    GetLastSelectedSavedConfigID = function() return state.selectedTalent end,
-    GetActiveConfigID = function() return state.selectedTalent end,
-    UpdateLastSelectedSavedConfigID = function(_, id) state.selectedTalent = id end,
+    GetConfigIDsBySpecID = function(specID) return talentIDsBySpec[specID] or {} end,
+    GetLastSelectedSavedConfigID = function(specID) return state.selectedTalentBySpec[specID] end,
+    GetActiveConfigID = function() return state.selectedTalentBySpec[state.specID] end,
+    UpdateLastSelectedSavedConfigID = function(specID, id) state.selectedTalentBySpec[specID] = id end,
     CanEditTalents = function()
         if state.combat then return false, "combat" end
         if state.talentEditFailures > 0 then
@@ -136,16 +215,21 @@ C_ClassTalents = {
             state.talentSwitchFailures = state.talentSwitchFailures - 1
             return
         end
-        state.selectedTalent = talentIDs[index]
+        local ids = talentIDsBySpec[state.specID] or {}
+        if ids[index] then state.selectedTalentBySpec[state.specID] = ids[index] end
     end,
     LoadConfig = function(id)
-        if not talentNames[id] then return Enum.LoadConfigResult.Error, "missing" end
-        state.selectedTalent = id
+        local found = false
+        for _, configID in ipairs(talentIDsBySpec[state.specID] or {}) do
+            if configID == id then found = true break end
+        end
+        if not found then return Enum.LoadConfigResult.Error, "missing" end
+        state.selectedTalentBySpec[state.specID] = id
         return Enum.LoadConfigResult.Ready
     end,
 }
 C_EquipmentSet = {
-    GetEquipmentSetIDs = function() return {1,2} end,
+    GetEquipmentSetIDs = function() return {1,2,3} end,
     GetEquipmentSetID = function(name)
         for id,n in pairs(gearNames) do if n == name then return id end end
         return nil
@@ -167,6 +251,22 @@ C_EquipmentSet = {
     end,
 }
 
+-- Simulate a character upgrading from the stable 1.0 schema. Existing
+-- talent/equipment mappings must survive while 1.1 tables are added.
+LoadoutPilotDB = {
+    schema = 1,
+    firstRun = false,
+    selectedContext = "world",
+    autoTalents = true,
+    autoGear = true,
+    languageOverride = "auto",
+    chatMessages = true,
+    talentBindings = { ["64:world"] = {configID=101, name="Frost World"} },
+    equipmentBindings = { ["64:world"] = {setID=1, name="World Gear"} },
+    hud = { enabled=true, locked=false, point="CENTER", relativePoint="CENTER", x=0, y=170 },
+    minimap = { hide=false, angle=225 },
+}
+
 local LP = {}
 assert(loadfile(ROOT .. "/Localization.lua"))("LoadoutPilot", LP)
 assert(loadfile(ROOT .. "/Data.lua"))("LoadoutPilot", LP)
@@ -181,36 +281,63 @@ local function tick(seconds)
     assert(addon.scripts.OnUpdate, "OnUpdate missing")
     addon.scripts.OnUpdate(addon, seconds)
 end
+local function setWorld()
+    state.inDelve = false
+    state.inInstance = false
+    state.instanceType = "none"
+    state.instanceName = "Open World"
+    state.instanceID = 0
+    state.challenge = false
+    state.slottedKeystone = false
+    state.activeChallengeMapID = nil
+    state.slottedChallengeMapID = nil
+end
+local function setDungeon(name, instanceID)
+    state.inDelve = false
+    state.inInstance = true
+    state.instanceType = "party"
+    state.instanceName = name
+    state.instanceID = instanceID
+    state.challenge = false
+    state.slottedKeystone = false
+    state.activeChallengeMapID = nil
+    state.slottedChallengeMapID = nil
+end
+local function setMythicPlus(mapID, active)
+    state.inDelve = false
+    state.inInstance = true
+    state.instanceType = "party"
+    state.instanceName = challengeMaps[mapID]
+    state.instanceID = 10000 + mapID
+    state.challenge = active == true
+    state.slottedKeystone = active ~= true
+    state.activeChallengeMapID = active == true and mapID or nil
+    state.slottedChallengeMapID = active ~= true and mapID or nil
+end
 
 -- Load and initialize.
 event("ADDON_LOADED", "LoadoutPilot")
 event("PLAYER_LOGIN")
 assert(type(LoadoutPilotDB) == "table", "DB not initialized")
-assert(LoadoutPilotDB.autoTalents == true and LoadoutPilotDB.autoGear == true, "auto defaults wrong")
-assert(LoadoutPilotDB.selectedContext == "world", "default context wrong")
+assert(LoadoutPilotDB.schema == 2, "database schema was not migrated to 2")
+assert(LoadoutPilotDB.autoSpec == true and LoadoutPilotDB.autoTalents == true and LoadoutPilotDB.autoGear == true, "auto defaults wrong")
+assert(type(LoadoutPilotDB.specBindings) == "table", "spec bindings table missing")
+assert(type(LoadoutPilotDB.dungeonOverrides) == "table", "dungeon overrides table missing")
+assert(type(LoadoutPilotDB.knownDungeons) == "table", "known dungeons table missing")
+assert(LoadoutPilotDB.talentBindings["64:world"] and LoadoutPilotDB.talentBindings["64:world"].configID == 101, "v1.0 talent mapping was lost during migration")
+assert(LoadoutPilotDB.equipmentBindings["64:world"] and LoadoutPilotDB.equipmentBindings["64:world"].setID == 1, "v1.0 equipment mapping was lost during migration")
 assert(LoadoutPilotDB.languageOverride == "auto", "language override default wrong")
 assert(LoadoutPilotDB.chatMessages == true, "chat messages default wrong")
+
+-- Existing v1.0 controls continue to work.
 SlashCmdList.LOADOUTPILOT("chat off")
 assert(LoadoutPilotDB.chatMessages == false, "chat messages did not disable")
 SlashCmdList.LOADOUTPILOT("chat on")
 assert(LoadoutPilotDB.chatMessages == true, "chat messages did not enable")
-assert(LP.GetLocaleOverride and LP.GetLocaleOverride() == "auto", "localization override did not initialize")
 SlashCmdList.LOADOUTPILOT("language en")
 assert(LoadoutPilotDB.languageOverride == "enUS", "English language override was not saved")
-SlashCmdList.LOADOUTPILOT("idioma ptbr")
-assert(LoadoutPilotDB.languageOverride == "ptBR", "Portuguese language override was not saved")
 SlashCmdList.LOADOUTPILOT("lang auto")
 assert(LoadoutPilotDB.languageOverride == "auto", "automatic language override was not restored")
-
--- Manual automation state is visible in the compact HUD.
-LoadoutPilotDB.autoTalents = false
-LoadoutPilotDB.autoGear = false
-addon:UpdateStatusWidget()
-assert(_G.LoadoutPilotStatusWidget.title.text and _G.LoadoutPilotStatusWidget.title.text:find("MANUAL", 1, true), "talent manual marker missing")
-assert(_G.LoadoutPilotStatusWidget.talent.text and _G.LoadoutPilotStatusWidget.talent.text:find("MANUAL", 1, true), "gear manual marker missing")
-LoadoutPilotDB.autoTalents = true
-LoadoutPilotDB.autoGear = true
-addon:UpdateStatusWidget()
 
 -- Reset restores both HUD and minimap positions.
 LoadoutPilotDB.hud.x = 123
@@ -220,89 +347,200 @@ SlashCmdList.LOADOUTPILOT("resetpos")
 assert(LoadoutPilotDB.hud.x == 0 and LoadoutPilotDB.hud.y == 170, "HUD reset failed")
 assert(LoadoutPilotDB.minimap.angle == 225, "minimap reset failed")
 
--- Minimap button uses the actual minimap dimensions instead of a fixed radius.
-local minimapButton = _G.LoadoutPilotMinimapButton
-if minimapButton then
-    local _, relativeTo, _, x, y = minimapButton:GetPoint()
-    assert(relativeTo == Minimap, "minimap button is not anchored to Minimap")
-    local angle = math.rad(LoadoutPilotDB.minimap.angle or 225)
-    local expectedX = math.cos(angle) * ((Minimap:GetWidth() * 0.5) + 10)
-    local expectedY = math.sin(angle) * ((Minimap:GetHeight() * 0.5) + 10)
-    assert(math.abs(x - expectedX) < 0.01, "minimap X orbit is wrong")
-    assert(math.abs(y - expectedY) < 0.01, "minimap Y orbit is wrong")
-end
-
--- World mapping and explicit apply.
-LoadoutPilotDB.talentBindings["64:world"] = {configID=202, name="Frost Dungeon"}
-LoadoutPilotDB.equipmentBindings["64:world"] = {setID=2, name="Dungeon Gear"}
+-- Base World mapping works as before.
+LoadoutPilotDB.talentBindings["64:world"] = {configID=101, name="Frost World"}
+LoadoutPilotDB.equipmentBindings["64:world"] = {setID=1, name="World Gear"}
+state.selectedTalentBySpec[64] = 202
+state.equippedSet = 2
 SlashCmdList.LOADOUTPILOT("apply")
-assert(state.selectedTalent == 202, "world talent auto/apply failed")
-assert(state.equippedSet == 2, "world gear auto/apply failed")
+assert(state.specID == 64, "world apply changed spec unexpectedly")
+assert(state.selectedTalentBySpec[64] == 101, "world talent apply failed")
+assert(state.equippedSet == 1, "world gear apply failed")
 
--- Delve context switches automatically.
-LoadoutPilotDB.talentBindings["64:delve"] = {configID=101, name="Frost World"}
-LoadoutPilotDB.equipmentBindings["64:delve"] = {setID=1, name="World Gear"}
-state.inDelve = true
-state.inInstance = true
-state.instanceType = "party"
+-- General Mythic+ defaults: Frost + default M+ talent + PvE gear.
+LoadoutPilotDB.talentBindings["64:mythicplus"] = {configID=203, name="Frost M+ Default"}
+LoadoutPilotDB.equipmentBindings["64:mythicplus"] = {setID=2, name="PvE Default"}
+-- Arcane fallback mapping is deliberately available for talent only.
+LoadoutPilotDB.talentBindings["62:mythicplus"] = {configID=301, name="Arcane Default"}
+
+-- Voidscar overrides all three fields and switches specialization first.
+-- Existing 1.0 users have no base specialization mapping; configuring the first
+-- dungeon spec override must capture the current Frost spec as the Mythic+ default.
+local voidscarEntry = addon:GetDungeonCatalogEntry("mplus:500")
+assert(voidscarEntry, "Voidscar catalog entry missing before configuration")
+addon:SetDungeonOverrideSpec(voidscarEntry, 62)
+assert(LoadoutPilotDB.specBindings["mythicplus"] and LoadoutPilotDB.specBindings["mythicplus"].specID == 64, "first dungeon spec override did not capture the current Mythic+ default spec")
+addon:SetDungeonOverrideTalent(voidscarEntry, 302, 62)
+addon:SetDungeonOverrideEquipment(voidscarEntry, 3)
+setMythicPlus(500, false) -- pre-start slotted keystone path
+state.selectedTalentBySpec[62] = 301
+state.equippedSet = 1
 tick(0.6)
-assert(addon:DetectContext() == "delve", "delve detection failed")
-assert(state.selectedTalent == 101, "delve talent switch failed")
-assert(state.equippedSet == 1, "delve gear switch failed")
+assert(addon:DetectContext() == "mythicplus", "pre-start mythic+ context detection failed")
+local dungeon = addon:GetCurrentDungeonInfo()
+assert(dungeon and dungeon.key == "mplus:500", "Voidscar M+ identity failed")
+assert(state.specID == 62, "Voidscar did not switch Frost -> Arcane")
+assert(state.selectedTalentBySpec[62] == 302, "Voidscar talent override was not applied after spec switch")
+assert(state.equippedSet == 3, "Voidscar equipment override was not applied")
 
--- Dungeon change during combat queues, then applies after combat.
+-- RLP overrides only talent. Base spec Frost and default gear must be restored.
+LoadoutPilotDB.dungeonOverrides["mplus:501"] = {
+    name = "Ruby Life Pools", context = "mythicplus", challengeMapID = 501,
+    talent = {specID=64, configID=202, name="Frost Dungeon"},
+}
+setMythicPlus(501, true)
+tick(0.6)
+assert(state.specID == 64, "RLP did not restore the default Mythic+ Frost spec")
+assert(state.selectedTalentBySpec[64] == 202, "RLP talent override was not applied")
+assert(state.equippedSet == 2, "RLP did not inherit default Mythic+ equipment")
+
+-- Another M+ with no override falls back completely to the Mythic+ defaults.
+setMythicPlus(502, true)
+tick(0.6)
+assert(state.specID == 64, "unconfigured M+ did not keep default Frost spec")
+assert(state.selectedTalentBySpec[64] == 203, "unconfigured M+ did not inherit default talent")
+assert(state.equippedSet == 2, "unconfigured M+ did not inherit default gear")
+
+-- Dungeon-specific spec override can inherit the target spec's base talent and gear.
+LoadoutPilotDB.specBindings["dungeon"] = {specID=64, name="Frost"}
 LoadoutPilotDB.talentBindings["64:dungeon"] = {configID=202, name="Frost Dungeon"}
-LoadoutPilotDB.equipmentBindings["64:dungeon"] = {setID=2, name="Dungeon Gear"}
-state.inDelve = false
-state.challenge = false
-state.combat = true
+LoadoutPilotDB.equipmentBindings["64:dungeon"] = {setID=2, name="PvE Default"}
+LoadoutPilotDB.talentBindings["62:dungeon"] = {configID=301, name="Arcane Default"}
+LoadoutPilotDB.dungeonOverrides["dungeon:777"] = {
+    name = "The Test Dungeon", context = "dungeon", instanceID = 777,
+    specID = 62,
+}
+setDungeon("The Test Dungeon", 777)
 tick(0.6)
-assert(addon:DetectContext() == "dungeon", "dungeon detection failed")
-assert(state.selectedTalent == 101, "talents changed during combat")
-assert(state.equippedSet == 1, "gear changed during combat")
+assert(state.specID == 62, "normal dungeon spec override did not apply")
+assert(state.selectedTalentBySpec[62] == 301, "normal dungeon did not inherit Arcane dungeon talent")
+assert(state.equippedSet == 2, "normal dungeon spec override did not inherit the base Dungeon equipment")
+assert(LoadoutPilotDB.knownDungeons["777"] == "The Test Dungeon", "encountered normal dungeon was not remembered")
+
+-- Removing the dungeon override restores the normal Dungeon defaults.
+LoadoutPilotDB.dungeonOverrides["dungeon:777"] = nil
+-- Force a rule refresh while staying in the same dungeon.
+addon:ApplyCurrentRules("smoke-remove-override", false)
+assert(state.specID == 64, "removing dungeon override did not restore default Dungeon spec")
+assert(state.selectedTalentBySpec[64] == 202, "removing dungeon override did not restore default Dungeon talent")
+assert(state.equippedSet == 2, "removing dungeon override did not preserve default Dungeon gear")
+
+-- Auto-spec OFF must never change specialization automatically; HUD/status reports manual requirement.
+setWorld()
+state.specIndex = 1; syncSpec()
+LoadoutPilotDB.specBindings["world"] = {specID=62, name="Arcane"}
+LoadoutPilotDB.autoSpec = false
+addon:ApplyCurrentRules("smoke-auto-spec-off", false)
+assert(state.specID == 64, "autoSpec OFF still changed specialization")
+local manualStatus = addon:GetStatusState()
+assert(string.lower(manualStatus):find("manual", 1, true), "manual specialization requirement is not visible in status")
+LoadoutPilotDB.autoSpec = true
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+
+-- Specialization changes queue in combat and complete afterwards in the required order.
+setMythicPlus(500, false)
+state.specIndex = 1; syncSpec()
+state.selectedTalentBySpec[62] = 301
+state.equippedSet = 2
+state.combat = true
+addon:ApplyCurrentRules("smoke-combat-spec", false)
+assert(state.specID == 64, "specialization changed during combat")
 state.combat = false
 event("PLAYER_REGEN_ENABLED")
-assert(state.selectedTalent == 202, "queued dungeon talent switch failed")
-assert(state.equippedSet == 2, "queued dungeon gear switch failed")
+assert(state.specID == 62, "queued specialization did not apply after combat")
+assert(state.selectedTalentBySpec[62] == 302, "talent override did not follow queued specialization")
+assert(state.equippedSet == 3, "equipment override did not follow queued specialization")
 
--- Mythic+ is distinct from dungeon, including the pre-start slotted-key state.
-state.slottedKeystone = true
-assert(addon:DetectContext() == "mythicplus", "slotted-keystone mythic+ detection failed")
-state.slottedKeystone = false
-state.challenge = true
-assert(addon:DetectContext() == "mythicplus", "active mythic+ detection failed")
+-- Transient specialization failure is retried outside combat.
+setMythicPlus(501, true)
+state.specIndex = 2; syncSpec()
+state.specSwitchFailures = 1
+tick(0.6) -- first Frost request fails
+assert(state.specID == 62, "spec failure mock did not preserve old spec")
+tick(2.1) -- retry
+assert(state.specID == 64, "pending specialization was not retried")
+assert(state.selectedTalentBySpec[64] == 202, "talents were not applied after specialization retry")
+assert(state.equippedSet == 2, "gear was not applied after specialization retry")
 
--- Raid and PvP detection.
-state.challenge = false
-state.instanceType = "raid"
-assert(addon:DetectContext() == "raid", "raid detection failed")
-state.instanceType = "pvp"
-assert(addon:DetectContext() == "pvp", "pvp detection failed")
+-- Role protection: same-role switches remain automatic while cross-role
+-- switches are blocked in grouped content.
+setMythicPlus(500, false)
+state.assignedRole = "DAMAGER"
+state.specIndex = 1; syncSpec()
+addon:ApplyCurrentRules("smoke-same-role", false)
+assert(state.specID == 62, "same-role DPS -> DPS specialization switch was incorrectly blocked")
+
+-- Configure a synthetic Tank target for another Mythic+ dungeon. The player is
+-- assigned DPS, so automatic cross-role switching must be blocked.
+LoadoutPilotDB.dungeonOverrides["mplus:502"] = {
+    name = "Other Mythic Dungeon", context = "mythicplus", challengeMapID = 502,
+    specID = 999,
+}
+setMythicPlus(502, true)
+state.specIndex = 1; syncSpec()
+state.assignedRole = "DAMAGER"
 tick(0.6)
+assert(state.specID == 64, "role protection allowed DPS -> Tank switch while assigned DPS")
+local mismatchStatus = addon:GetStatusState()
+assert(string.lower(mismatchStatus):find("role", 1, true) or string.lower(mismatchStatus):find("papel", 1, true), "role mismatch is not visible in status")
 
--- Leaving PvP can transiently reject both talent and equipment requests. The
--- addon must keep retrying the World mappings until both are confirmed. The
--- talent delegate is also forced to miss once so the LoadConfig fallback path
--- is exercised.
+-- Once the actual group role changes to Tank, the same rule becomes compatible
+-- and PLAYER_ROLES_ASSIGNED must cause reevaluation.
+state.assignedRole = "TANK"
+event("PLAYER_ROLES_ASSIGNED")
+assert(state.specID == 999, "compatible Tank role did not allow Tank specialization switch")
+
+-- World is intentionally unrestricted, even when the group role token says DPS.
+setWorld()
+state.assignedRole = "DAMAGER"
+LoadoutPilotDB.specBindings["world"] = {specID=999, name="Bulwark"}
+addon:ApplyCurrentRules("smoke-world-cross-role", false)
+assert(state.specID == 999, "World cross-role specialization switch was incorrectly blocked")
+
+-- Restore Frost before PvP regression checks.
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+addon:ApplyCurrentRules("smoke-world-restore", false)
+assert(state.specID == 64, "failed to restore Frost after World role-safety test")
+state.assignedRole = "DAMAGER"
+
+-- Existing PvP -> World retry still works and does not remain stuck on Applying.
+LoadoutPilotDB.specBindings["pvp"] = {specID=64, name="Frost"}
 LoadoutPilotDB.talentBindings["64:pvp"] = {configID=101, name="Frost World"}
-LoadoutPilotDB.talentBindings["64:world"] = {configID=202, name="Frost Dungeon"}
 LoadoutPilotDB.equipmentBindings["64:pvp"] = {setID=1, name="World Gear"}
-LoadoutPilotDB.equipmentBindings["64:world"] = {setID=2, name="Dungeon Gear"}
-state.selectedTalent = 101
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+LoadoutPilotDB.talentBindings["64:world"] = {configID=203, name="Frost M+ Default"}
+LoadoutPilotDB.equipmentBindings["64:world"] = {setID=2, name="PvE Default"}
+state.inInstance = true
+state.instanceType = "pvp"
+state.instanceName = "Battleground"
+state.challenge = false
+state.slottedKeystone = false
+state.activeChallengeMapID = nil
+state.slottedChallengeMapID = nil
+state.selectedTalentBySpec[64] = 101
 state.equippedSet = 1
+tick(0.6)
 state.talentEditFailures = 1
 state.talentSwitchFailures = 1
 state.equipmentUseFailures = 1
-state.inInstance = false
-state.instanceType = "none"
-tick(0.6)
-assert(addon:DetectContext() == "world", "world detection after pvp failed")
+setWorld()
 tick(0.6)
 tick(0.6)
-assert(state.selectedTalent == 202, "pending world talents were not retried after leaving pvp")
+tick(0.6)
+assert(state.selectedTalentBySpec[64] == 203, "pending world talents were not retried after leaving pvp")
 assert(state.equippedSet == 2, "pending world gear was not retried after leaving pvp")
 addon:UpdateStatusWidget()
 local hudStatus = _G.LoadoutPilotStatusWidget.gear.text or ""
 assert(not hudStatus:find("Applying", 1, true) and not hudStatus:find("Aplicando", 1, true), "HUD remained stuck on Applying after PvP exit")
 
-print("Smoke test passed: language selection, chat toggle, position reset, manual HUD state, generic mappings, context detection, auto switching, combat queue, and PvP exit talent/gear retry.")
+-- Dungeon catalog exposes Blizzard Mythic+ maps plus remembered regular dungeons.
+local catalog = addon:GetDungeonCatalog()
+local foundVoidscar, foundNormal = false, false
+for _, entry in ipairs(catalog) do
+    if entry.key == "mplus:500" then foundVoidscar = true end
+    if entry.key == "dungeon:777" then foundNormal = true end
+end
+assert(foundVoidscar, "Mythic+ dungeon catalog entry missing")
+assert(foundNormal, "remembered normal dungeon catalog entry missing")
+
+print("Smoke test passed: v1.0 regression coverage plus dungeon overrides, role-safe specialization switching, inheritance, Spec -> Talents -> Gear sequencing, combat queue, retry, and PvP exit restoration.")

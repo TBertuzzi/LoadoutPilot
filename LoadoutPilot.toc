@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: Loadout Pilot
-## Notes: Automatically switches your saved talent loadout and equipment set based on World, Delve, Dungeon, Mythic+, Raid, or PvP context.
+## Notes: Automatically switches specialization, saved talent loadouts, and equipment by content, with dungeon-specific overrides.
 ## Author: Thiago Bertuzzi
-## Version: 1.0.0
+## Version: 1.1.1
 ## SavedVariablesPerCharacter: LoadoutPilotDB
 ## X-Category: Interface Enhancements
 ## X-License: MIT

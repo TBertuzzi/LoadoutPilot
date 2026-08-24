@@ -1,76 +1,54 @@
-# Publishing Loadout Pilot 1.0.0
+# Publishing Loadout Pilot 1.1.1
 
-## 1. GitHub
+## Recommended flow
 
-Create an empty public repository named `LoadoutPilot`.
+1. Install `LoadoutPilot-v1.1.1-Test.zip` locally.
+2. Complete the specialization and dungeon-override checks in `TESTING.md`.
+3. If the live tests pass, commit the GitHub source and tag `v1.1.1`.
+4. Upload `LoadoutPilot-v1.1.1-CurseForge.zip` as a Release (or Beta while doing wider community testing).
 
-Extract the GitHub package and copy the contents of the `LoadoutPilot-v1.0.0` folder into the repository root.
+## GitHub
 
-Then run:
+From the repository root:
 
 ```bash
-git init
 git add .
-git commit -m "Release Loadout Pilot 1.0.0"
-git branch -M main
-git remote add origin YOUR_GITHUB_REPOSITORY_URL
-git push -u origin main
-```
-
-After the repository is online, create and push the stable tag:
-
-```bash
-git tag -a v1.0.0 -m "Loadout Pilot 1.0.0"
-git push origin v1.0.0
+git commit -m "Release Loadout Pilot 1.1.1"
+git tag -a v1.1.1 -m "Loadout Pilot 1.1.1"
+git push origin main
+git push origin v1.1.1
 ```
 
 The included GitHub Actions workflow validates and packages tagged releases.
 
-## 2. CurseForge project
+## CurseForge automation
 
-Create a World of Warcraft Addons project named **Loadout Pilot**.
-
-Use:
-
-- Summary from `CURSEFORGE_SUBMISSION.md`
-- Description from `CURSEFORGE_DESCRIPTION.md`
-- MIT license
-- Retail / Midnight 12.1.0
-- `branding/LoadoutPilot_Logo_512.png` as the project logo
-
-Upload `LoadoutPilot-v1.0.0-CurseForge.zip` as a **Release** file.
-
-## 3. Connect automated CurseForge releases
-
-After CurseForge approves the project, copy its numeric project ID and add this line to `LoadoutPilot.toc`:
+If the project has a numeric CurseForge project ID, add it to `LoadoutPilot.toc` as:
 
 ```text
 ## X-Curse-Project-ID: YOUR_PROJECT_ID
 ```
 
-Then create a CurseForge API token and add it to GitHub repository secrets as:
+Add the CurseForge API token to GitHub repository secrets as `CF_API_TOKEN`.
 
-```text
-CF_API_TOKEN
-```
+## Public support link
 
-The existing workflow passes the token to BigWigsMods/packager for tagged releases.
-
-## 4. Public support link
-
-The README, CurseForge description, release notes, and support page all contain:
+The README, CurseForge description, release notes, and support page contain:
 
 https://buymeacoffee.com/bertuzzi
 
-## 5. Final verification before upload
+## Final verification before upload
 
-- Confirm the addon folder is named `LoadoutPilot`.
-- Confirm `LoadoutPilot.toc` reports version `1.0.0` and Interface `120100`.
-- Confirm no Lua errors on login.
-- Confirm World mapping loads.
-- Confirm Delve, Dungeon, Mythic+, Raid, and PvP detection.
-- Confirm PvP -> World restores both talents and equipment.
-- Confirm the HUD leaves `Applying...` after the transition.
-- Confirm minimap button sits on the outer rim and persists after `/reload`.
-- Confirm PT-BR and English language selection.
-- Confirm chat messages can be disabled.
+- Version is `1.1.1`, Interface is `120100`.
+- Existing 1.0 mappings migrate without loss.
+- General specialization mapping works.
+- Dungeon override can change specialization and talent loadout.
+- Role protection blocks cross-role specialization changes in grouped content when incompatible with the protected role.
+- Same-role switches such as DPS -> DPS remain automatic.
+- An override can inherit the base equipment mapping.
+- Moving to another dungeon restores its override or the Mythic+ default.
+- Specialization changes queue safely during combat.
+- PvP -> World still restores talents and equipment.
+- HUD leaves `Applying...` after successful transitions.
+- Minimap button remains on the outer rim.
+- PT-BR / English selector and chat-message option still work.

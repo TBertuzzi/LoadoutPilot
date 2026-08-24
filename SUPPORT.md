@@ -3,11 +3,13 @@
 For bug reports, please include:
 
 - WoW Retail version
-- class and specialization
-- detected content type
+- class and current specialization
+- detected content type and dungeon name, if applicable
+- configured target specialization
 - configured talent loadout and equipment set
+- whether a dungeon-specific override is active
 - exact steps to reproduce the problem
-- whether the issue happened during combat or a loading/content transition
+- whether the issue happened during combat, a loading/content transition, or after a keystone was slotted
 - Lua error text, if any
 - a screenshot when the problem is visual
 

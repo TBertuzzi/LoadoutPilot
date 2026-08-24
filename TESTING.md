@@ -1,53 +1,76 @@
-# Live testing checklist - 1.0.0
+# Live testing checklist - 1.1.1
 
 Test on World of Warcraft Retail 12.1.0 with Lua errors enabled.
 
-## Basic
+## Regression from 1.0
 
 - `/lpilot` opens and closes settings.
-- First run opens settings automatically.
-- Compact HUD shows mapped talents, equipment, and current status; class/spec/context remain available in the hover tooltip.
-- HUD can be moved when unlocked and persists after `/reload`.
+- Existing World, Delve, Dungeon, Mythic+, Raid, and PvP talent/equipment mappings survive the update.
+- PvP -> World restores both talents and equipment and the HUD does not remain on `Applying...`.
+- Language selection, optional chat messages, HUD movement, minimap movement, and Restore Positions still work.
+- No combat abilities are cast and no talent/equipment set is created or deleted by the addon.
 
-## Every specialization tested
+## General specialization mappings
 
-- Talent picker lists that spec's saved Blizzard loadouts.
-- Equipment picker lists Blizzard Equipment Manager sets.
-- Mapping survives `/reload`.
-- Switching spec displays that spec's independent mappings.
+For a class with at least two specializations:
 
-## Contexts
+1. Configure one specialization for World and another for Dungeon or Mythic+.
+2. Leave **Spec AUTO** enabled.
+3. Change contexts while out of combat.
+4. Confirm specialization changes first, followed by the configured talent loadout and equipment set.
+5. Disable **Spec AUTO** and confirm the addon reports the specialization change as manual instead of changing it automatically.
+6. Re-enable Spec AUTO and confirm the pending rule can be applied.
 
-- Open World -> World
-- Delve -> Delve
-- Normal/Heroic/Mythic dungeon without active keystone -> Dungeon
-- Active keystone -> Mythic+
-- Raid -> Raid
-- Battleground/Arena -> PvP
+## Dungeon Overrides UI
 
-## Automation
+- `/lpilot overrides` opens/closes the Dungeon Overrides window.
+- Mythic+ dungeons appear in the list.
+- Enter a normal dungeon and confirm it becomes available in the remembered dungeon list.
+- Select the current dungeon with **Select current dungeon**.
+- Configure and clear specialization, talent, and equipment override fields independently.
+- Verify **Inherit** correctly shows/uses the normal Dungeon or Mythic+ default.
+- Change an override's specialization and confirm an incompatible old talent override is cleared.
+- Remove the entire override and confirm the default context rule returns.
 
-- Entering a configured context switches to the mapped talent loadout when allowed.
-- Entering a configured context equips the mapped gear outside combat.
-- Entering/changing context during combat queues changes.
-- Leaving combat retries queued changes.
-- PvP -> World: verify talents and equipment both return to the World mappings and the HUD does not remain on `Applying...`.
-- Repeat PvP -> World after a loading screen/teleport to exercise transient transition retries.
-- `Apply mapped loadout now` retries both talent and gear mappings.
-- Missing/deleted loadouts are reported without Lua errors.
-- Delete/recreate a loadout or equipment set with the same name and verify name-based repair.
+## Recommended real scenario
 
-## Regression
+Configure:
 
-- No combat abilities are cast.
-- No equipment set or talent loadout is created/deleted by the addon.
-- No `ADDON_ACTION_BLOCKED` spam while simply entering combat.
+- Mythic+ default -> Frost + M+ Default + PvE Default
+- Dungeon A -> alternate specialization + dungeon-specific talent + inherited PvE gear
+- Dungeon B -> default specialization + different talent + inherited PvE gear
+- Dungeon C -> no override
+
+Then verify:
+
+1. Enter/prep Dungeon A: alternate specialization -> dungeon talent -> gear -> Ready.
+2. Move to Dungeon B: default specialization is restored -> Dungeon B talent -> inherited gear -> Ready.
+3. Move to Dungeon C: full Mythic+ default is restored.
+
+## Mythic+ timing
+
+- With a keystone slotted before the timer starts, confirm the addon identifies that dungeon and prepares its override.
+- Start the key and confirm the rule does not loop or spam if WoW no longer permits specialization/talent changes.
+- If a requested change is blocked, confirm status remains understandable and the addon retries only when appropriate.
+
+## Combat queue
+
+- Trigger a context/dungeon rule requiring a specialization change while in combat.
+- Confirm the specialization does not change during combat.
+- Leave combat and confirm the sequence completes: specialization -> talents -> equipment.
 
 ## Minimap button
 
-1. Verify the Loadout Pilot button sits on the **outer rim** of the minimap, not over the map contents.
-2. Resize the minimap in Edit Mode and confirm the button follows the new rim automatically.
-3. Drag the button around the minimap and confirm it remains on the outer edge.
-4. Reload the UI and confirm the saved angle is preserved.
-5. Confirm the button uses the standard Blizzard-style circular border size, matching the DK Mentor implementation.
-6. Left-click should open/close Loadout Pilot; right-click should apply the mapped loadout.
+- Confirm the button stays on the outer minimap rim.
+- Resize the minimap in Edit Mode and confirm the button follows the rim.
+- Drag it, `/reload`, and verify the saved angle remains.
+- Left-click opens settings; right-click applies the current mapped rule.
+
+
+## 1.1.1 role-safety checks
+
+- As DPS in a grouped Dungeon/M+/Raid/PvP context, verify a DPS -> DPS dungeon override still switches automatically.
+- As DPS, configure a target Tank spec and verify Loadout Pilot reports a role mismatch instead of switching automatically.
+- Change the assigned group role to Tank and verify the rule is reevaluated.
+- Verify World and Delve rules can still change between roles.
+- Verify spec pickers and the HUD tooltip show Tank/Healer/DPS labels.

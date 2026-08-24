@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.1.1 - 2026-08-24
+
+Role-safety update for specialization automation.
+
+- Added group-role detection using the player's assigned Tank, Healer, or DPS role.
+- Added specialization-role detection and role labels throughout the configuration UI.
+- Dungeon, Mythic+, Raid, and PvP rules now block automatic cross-role specialization changes when they conflict with the player's assigned role.
+- If the group role is unavailable, cross-role automatic switches are conservatively blocked by comparing the target role with the current specialization role.
+- Same-role switches such as Frost -> Unholy remain automatic.
+- World and Delve specialization changes remain unrestricted.
+- Added role details to the HUD tooltip and role-mismatch status messaging.
+- Added PLAYER_ROLES_ASSIGNED handling so compatible pending rules can be reevaluated when the player's role changes.
+
+## 1.1.0 - 2026-08-24
+
+Dungeon Rules update.
+
+- Added optional automatic specialization mapping for each general content context.
+- When the first dungeon specialization override is created for a context with no default spec, the current spec is captured as that context default so the addon can restore it afterward.
+- Added dungeon-specific overrides for Mythic+ and encountered normal dungeons.
+- Dungeon overrides can independently override specialization, talent loadout, and equipment set.
+- Unconfigured override fields inherit the normal Dungeon or Mythic+ defaults.
+- Equipment inheritance can fall back to the base context mapping even when a dungeon override changes specialization.
+- Added ordered specialization -> talents -> equipment application so spec-specific talent loadouts are only applied after the target specialization is active.
+- Added combat-safe pending/retry logic for specialization changes.
+- Added Mythic+ dungeon identity using active/slotted challenge map information.
+- Added remembered normal-dungeon identities after the player encounters them.
+- Added the Dungeon Overrides configuration window and `/lpilot overrides`.
+- Added `/lpilot spec on|off` and a Spec AUTO control in the main window.
+- Preserved all 1.0 PvP-exit talent/equipment recovery, language, HUD, minimap, chat, and position-reset behavior.
+
 ## 1.0.0 - 2026-08-24
 
 First stable public release.
