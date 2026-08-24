@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.2 - 2026-08-24
+
+Dungeon override UX, loot specialization, and unified dungeon identity update.
+
+- Fixed Dungeon Overrides popup menus rendering behind the override panel by placing picker frames above the panel's frame strata/level.
+- Added a per-dungeon **Loot Specialization** override.
+- Loot Spec supports every specialization for the current class plus **Current specialization** (WoW loot spec ID `0`).
+- Loot specialization is independent from playing-spec role protection, so a DPS player can intentionally select Tank/Healer loot without changing the role they are playing.
+- The addon remembers the loot specialization that was active before a dungeon loot override and restores it when the override is no longer active.
+- Added retry/verification using `GetLootSpecialization`, `SetLootSpecialization`, and `PLAYER_LOOT_SPEC_UPDATED`.
+- Unified Dungeon and Mythic+ overrides into **one override per dungeon**. The same dungeon-specific rule now applies in Normal, Heroic, Mythic 0, and Mythic+.
+- Kept the general **Dungeon** and **Mythic+** mappings separate as fallbacks, so unconfigured fields still inherit the correct default for the current content.
+- Mythic+ catalog entries are resolved to the same InstanceID used by regular dungeon instances, preventing duplicate `[M+]` and `[Dungeon]` records for the same place.
+- Added automatic migration from the previous `mplus:<challengeID>` override keys to the unified dungeon key. If both old Dungeon and Mythic+ overrides existed, the old Mythic+ values win on conflicting explicitly configured fields.
+- Added loot-specialization details to the HUD tooltip and `/lpilot status` output.
+- Extended PT-BR and English localization, tests, and documentation.
+
 ## 1.1.1 - 2026-08-24
 
 Role-safety update for specialization automation.

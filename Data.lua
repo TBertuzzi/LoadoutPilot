@@ -2,9 +2,9 @@ local ADDON_NAME, LP = ...
 LP.Data = LP.Data or {}
 local Data = LP.Data
 
-Data.version = "1.1.1"
+Data.version = "1.1.2"
 Data.interface = 120100
-Data.schema = 2
+Data.schema = 4
 
 Data.contextOrder = {
     "world",

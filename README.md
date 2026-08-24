@@ -1,6 +1,6 @@
 # Loadout Pilot
 
-Loadout Pilot is a World of Warcraft Retail addon that automatically follows the content you are playing with your saved specialization, Blizzard talent loadouts, and equipment sets.
+Loadout Pilot is a World of Warcraft Retail addon that automatically follows the content you are playing with your saved specialization, loot specialization, Blizzard talent loadouts, and equipment sets.
 
 **Configure once. Let your loadout follow what you are doing.**
 
@@ -12,16 +12,17 @@ Loadout Pilot is a World of Warcraft Retail addon that automatically follows the
 - Automatically switches specialization when configured and when WoW allows the change.
 - Automatically applies the mapped talent loadout after the target specialization is active.
 - Automatically equips the mapped equipment set outside combat.
-- Adds **dungeon-specific overrides** for individual Mythic+ and normal dungeons.
-- Dungeon overrides can independently override specialization, talents, and equipment.
-- Any field left on **Inherit** falls back to the normal Dungeon or Mythic+ rule.
+- Adds **one dungeon-specific override per dungeon**, shared across Normal, Heroic, Mythic 0, and Mythic+.
+- Dungeon overrides can independently override specialization, **loot specialization**, talents, and equipment.
+- Specialization, talents, and equipment left on **Inherit** fall back to the current Dungeon or Mythic+ default rule. Loot specialization can be left on **No override**.
+- General **Dungeon** and **Mythic+** mappings remain separate as fallbacks, while the dungeon-specific rule itself is shared.
 - Mythic+ identity is detected before the timer starts when a keystone is slotted, allowing the requested setup to be prepared before the run whenever WoW permits it.
-- Normal dungeons are remembered after you encounter them so they can be configured later.
-- Uses a safe order for advanced rules: **Specialization -> Talents -> Equipment**.
+- Seasonal Mythic+ dungeons are discovered automatically; other dungeons are remembered after you encounter them.
+- Uses a safe order for advanced rules: **Specialization -> Loot Spec -> Talents -> Equipment**.
 - Queues and retries changes temporarily blocked by combat or content transitions.
 - Includes recovery logic for PvP -> World transitions for both talents and equipment.
 - Compact adaptive HUD showing talent loadout, equipment set, and current readiness.
-- Hover tooltip shows class, current/target specialization, detected context, dungeon rule, talents, gear, and status.
+- Hover tooltip shows class, current/target specialization, loot specialization, detected context, dungeon rule, talents, gear, and status.
 - Custom minimap button with saved rim position.
 - Explicit **Apply mapped loadout now** fallback.
 - Optional routine chat notifications.
@@ -33,15 +34,15 @@ Loadout Pilot never creates, edits, or deletes your Blizzard talent loadouts or 
 
 ## Example: dungeon-specific rules
 
-You can keep a simple default Mythic+ setup and only override the dungeons that need something different:
+You can keep separate Dungeon and Mythic+ defaults, then add one shared override only for the dungeons that need something different:
 
+- **Dungeon default** -> Frost + Dungeon Build + PvE Default
 - **Mythic+ default** -> Frost + M+ Default + PvE Default
-- **Voidscar** -> Unholy + Voidscar Build + inherit PvE Default
-- **Ruby Life Pools** -> Frost + RLP Build + inherit PvE Default
-- **Any other M+ dungeon** -> automatically falls back to the Mythic+ default
+- **Voidscar override** -> Unholy + Blood loot spec + Voidscar Build + inherit PvE Default
 
-Each override field is optional. Changing only the specialization does not force you to create a separate equipment override; Loadout Pilot can inherit the base Dungeon/Mythic+ equipment mapping.
-If you create your first dungeon specialization override without having chosen a default specialization for that context, Loadout Pilot saves your current specialization as the context default so it has a stable spec to restore afterward. You can change that default at any time in the main window.
+The **Voidscar override applies whether you enter it as Normal, Heroic, Mythic 0, or Mythic+**. If a field is not overridden, Loadout Pilot inherits the default for the context you are actually playing: Dungeon outside a keystone run, Mythic+ during a keystone run.
+
+Each override field is optional. Changing only the specialization does not force you to create a separate equipment override. If you create your first dungeon specialization override without having chosen a default specialization, Loadout Pilot captures missing Dungeon/Mythic+ defaults where applicable so it has a stable spec to restore afterward. You can change those defaults at any time in the main window.
 
 ## Role-safe specialization automation
 
@@ -83,14 +84,19 @@ Mappings are stored per character.
 ## Configure dungeon overrides
 
 1. Open `/lpilot` and click **Dungeon overrides**, or use `/lpilot overrides`.
-2. Select a Mythic+ dungeon from the discovered list, or select a normal dungeon you have previously visited.
+2. Select a dungeon from the list. Seasonal Mythic+ dungeons are discovered automatically, while other dungeons appear after you visit them.
 3. Override any combination of:
-   - Specialization
+   - Specialization used to play the dungeon
+   - Loot specialization (including **Current specialization**)
    - Talent loadout
    - Equipment set
-4. Leave any field on **Inherit** to use the normal Dungeon/Mythic+ rule.
+4. Leave specialization/talents/equipment on **Inherit** to use the default for the current context: Dungeon for Normal/Heroic/Mythic 0, or Mythic+ for a keystone run. Leave loot specialization on **No override** if Loadout Pilot should not touch it.
 
-If an override changes specialization, Loadout Pilot waits for WoW to confirm the specialization before applying the matching talent loadout and equipment.
+A dungeon appears only once in the override list. The same override is reused across all dungeon difficulties, so you do not need separate `[Dungeon]` and `[M+]` entries.
+
+Loot specialization is independent from the role/spec used to play the dungeon. For example, you can remain Frost DPS while asking WoW to use Blood loot for that dungeon. When you leave the loot-spec override, Loadout Pilot restores the loot specialization that was active before the override session.
+
+If an override changes playing specialization, Loadout Pilot waits for WoW to confirm the specialization before applying the matching talent loadout and equipment.
 
 ## Commands
 
@@ -106,7 +112,7 @@ If an override changes specialization, Loadout Pilot waits for WoW to confirm th
 
 ## Blizzard restrictions
 
-Loadout Pilot does not cast abilities and does not automate combat. Specialization, talent, and equipment changes are requested only through Blizzard-supported player configuration APIs.
+Loadout Pilot does not cast abilities and does not automate combat. Specialization, loot-specialization, talent, and equipment changes are requested only through Blizzard-supported player configuration APIs.
 
 Some changes are restricted during combat or certain activity states. Loadout Pilot does not bypass those restrictions: it queues/retries supported changes and shows the pending state until the client allows the operation. In an active Mythic+ run, specialization/talent changes may be unavailable; the addon is designed to identify the dungeon and prepare the rule before the timer starts when possible.
 

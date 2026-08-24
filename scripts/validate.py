@@ -3,13 +3,13 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 INTERFACE = "120100"
 REQUIRED = [
     "LoadoutPilot.toc", "Localization.lua", "Data.lua", "Core.lua",
     "README.md", "CHANGELOG.md", "LICENSE", "TESTING.md",
     "CURSEFORGE_DESCRIPTION.md", "CURSEFORGE_SUBMISSION.md", "PUBLISHING.md",
-    "SUPPORT.md", "RELEASE_NOTES_v1.1.1.md",
+    "SUPPORT.md", "RELEASE_NOTES_v1.1.2.md",
     "Media/MinimapIcon.tga",
 ]
 
@@ -30,7 +30,7 @@ for expected in (
 data = (ROOT / "Data.lua").read_text(encoding="utf-8")
 for expected in (
     f'Data.version = "{VERSION}"',
-    "Data.schema = 2",
+    "Data.schema = 4",
 ):
     if expected not in data:
         errors.append(f"Data.lua missing: {expected}")
@@ -55,6 +55,16 @@ for snippet in (
     "GetRoleProtectionState",
     "PLAYER_ROLES_ASSIGNED",
     "ROLE_MISMATCH_STATUS",
+    # 1.1.2 loot specialization overrides and popup layering.
+    "GetLootSpecialization",
+    "SetLootSpecialization",
+    "PLAYER_LOOT_SPEC_UPDATED",
+    "lootSpecID",
+    "SetDungeonOverrideLootSpec",
+    "SyncLootSpecializationRule",
+    "LoadoutPilotLootSpecPicker",
+    "PICKER_FRAME_LEVEL",
+    'frame:SetFrameStrata("FULLSCREEN_DIALOG")',
     "TrySwitchSpecialization",
     "pending-spec-retry",
     "specBindings",
@@ -62,9 +72,14 @@ for snippet in (
     # 1.1 dungeon overrides and identity.
     "GetCurrentDungeonInfo",
     "GetDungeonCatalog",
+    "GetChallengeDungeonIdentity",
+    "EJ_GetInstanceForMap",
+    "EJ_GetInstanceInfo",
+    "MigrateUnifiedDungeonOverrides",
     "GetActiveChallengeMapID",
     "GetSlottedKeystoneInfo",
     '"mplus:"',
+    '"dungeon:"',
     '"dungeon:"',
     "dungeonOverrides",
     "knownDungeons",
@@ -93,11 +108,17 @@ for snippet in (
     "LANGUAGE_EN",
     "SPECIALIZATION_OVERRIDE",
     "DUNGEON_OVERRIDES_DESCRIPTION",
+    "DUNGEON_SCOPE_LABEL",
+    "DUNGEON_FALLBACK_UNIFIED",
     "INHERIT_DEFAULT",
     "SPEC_MANUAL_REQUIRED",
     "GROUP_ROLE",
     "TARGET_ROLE",
     "ROLE_MISMATCH_STATUS",
+    "LOOT_SPEC_OVERRIDE",
+    "CHOOSE_LOOT_SPEC_OVERRIDE",
+    "CURRENT_SPECIALIZATION_LOOT",
+    "NO_LOOT_OVERRIDE_ACTIVE",
 ):
     if snippet not in localization:
         errors.append(f"Expected localization marker missing: {snippet}")
@@ -109,7 +130,7 @@ for forbidden in (
     if forbidden in core:
         errors.append(f"Combat automation API must not be used: {forbidden}")
 
-for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v1.1.1.md"):
+for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v1.1.2.md"):
     path = ROOT / rel
     if path.is_file() and "buymeacoffee.com/bertuzzi" not in path.read_text(encoding="utf-8"):
         errors.append(f"Support link missing from {rel}")

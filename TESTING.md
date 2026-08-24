@@ -1,4 +1,4 @@
-# Live testing checklist - 1.1.1
+# Live testing checklist - 1.1.2
 
 Test on World of Warcraft Retail 12.1.0 with Lua errors enabled.
 
@@ -24,11 +24,12 @@ For a class with at least two specializations:
 ## Dungeon Overrides UI
 
 - `/lpilot overrides` opens/closes the Dungeon Overrides window.
-- Mythic+ dungeons appear in the list.
+- Seasonal Mythic+ dungeons appear in the list.
 - Enter a normal dungeon and confirm it becomes available in the remembered dungeon list.
+- Confirm the same dungeon appears only once even if it is both a seasonal Mythic+ dungeon and a dungeon you have visited normally.
 - Select the current dungeon with **Select current dungeon**.
-- Configure and clear specialization, talent, and equipment override fields independently.
-- Verify **Inherit** correctly shows/uses the normal Dungeon or Mythic+ default.
+- Configure and clear specialization, loot specialization, talent, and equipment override fields independently.
+- Verify **Inherit** correctly shows/uses the normal Dungeon or Mythic+ default for playing spec/talents/gear, and **No override** leaves loot spec unmanaged.
 - Change an override's specialization and confirm an incompatible old talent override is cleared.
 - Remove the entire override and confirm the default context rule returns.
 
@@ -36,16 +37,17 @@ For a class with at least two specializations:
 
 Configure:
 
+- Dungeon default -> Frost + Dungeon Default + PvE Default
 - Mythic+ default -> Frost + M+ Default + PvE Default
-- Dungeon A -> alternate specialization + dungeon-specific talent + inherited PvE gear
-- Dungeon B -> default specialization + different talent + inherited PvE gear
-- Dungeon C -> no override
+- Dungeon A override -> alternate specialization + dungeon-specific talent + inherited PvE gear
+- Dungeon B -> no override
 
 Then verify:
 
-1. Enter/prep Dungeon A: alternate specialization -> dungeon talent -> gear -> Ready.
-2. Move to Dungeon B: default specialization is restored -> Dungeon B talent -> inherited gear -> Ready.
-3. Move to Dungeon C: full Mythic+ default is restored.
+1. Enter Dungeon A as Mythic 0: alternate specialization -> loot spec -> dungeon talent -> gear -> Ready.
+2. Leave and re-enter the same Dungeon A with a keystone slotted: the **same override** is reused; no second override entry is needed.
+3. Enter Dungeon B as Mythic 0 with no override: the Dungeon default is used.
+4. Enter Dungeon B as Mythic+ with no override: the Mythic+ default is used.
 
 ## Mythic+ timing
 
@@ -74,3 +76,26 @@ Then verify:
 - Change the assigned group role to Tank and verify the rule is reevaluated.
 - Verify World and Delve rules can still change between roles.
 - Verify spec pickers and the HUD tooltip show Tank/Healer/DPS labels.
+
+## 1.1.2 dropdown layering regression
+
+- Open **Dungeon Overrides** and open the Specialization, Loot Spec, Talent, and Equipment pickers.
+- Confirm every popup row renders **above** the override panel instead of behind it.
+- Pay special attention to the lower Talent/Equipment buttons, where the old bug made only the bottom of the picker visible outside the panel.
+
+## 1.1.2 loot-specialization checks
+
+- Start with an explicit loot specialization selected in WoW.
+- Configure Dungeon A with a different Loot Spec override and verify it changes on entry/preparation.
+- Move to a dungeon with **No override** and verify the previous loot specialization is restored.
+- Configure **Current specialization** and verify WoW reports the current-spec loot mode.
+- Verify a DPS player can select a Tank/Healer loot specialization without the playing-spec role-safety check blocking the loot choice.
+- Temporarily change loot spec manually while a dungeon override is active and verify Loadout Pilot re-applies the configured override.
+
+## 1.1.2 unified Dungeon/Mythic+ override checks
+
+- If you previously tested 1.1.0-1.1.2 builds, confirm old `[M+]` overrides are migrated and remain configured after `/reload`.
+- Pick a seasonal Mythic+ dungeon, configure a playing-spec override, and verify there is only one row for that dungeon.
+- Enter that dungeon as Mythic 0 and verify the override applies.
+- Slot a keystone for the same dungeon and verify the same override remains active.
+- Clear one override field and verify inheritance follows the current context: Dungeon default in Mythic 0, Mythic+ default in a keystone run.

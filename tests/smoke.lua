@@ -28,6 +28,12 @@ local challengeMaps = {
     [500] = "Voidscar",
     [501] = "Ruby Life Pools",
     [502] = "Other Mythic Dungeon",
+    [503] = "No Journal Dungeon",
+}
+local challengeDungeonIDs = {
+    [500] = { uiMapID = 20500, journalID = 30500, instanceID = 10500 },
+    [501] = { uiMapID = 20501, journalID = 30501, instanceID = 10501 },
+    [502] = { uiMapID = 20502, journalID = 30502, instanceID = 10502 },
 }
 
 local state = {
@@ -53,6 +59,8 @@ local state = {
     talentSwitchFailures = 0,
     specSwitchFailures = 0,
     assignedRole = "DAMAGER",
+    lootSpecID = 0,
+    lootSpecSetFailures = 0,
 }
 
 local function syncSpec()
@@ -67,8 +75,11 @@ local function widget()
     function methods:SetSize(w, h) self.width = w; self.height = h end
     function methods:SetWidth(w) self.width = w end
     function methods:SetHeight(h) self.height = h end
-    function methods:SetFrameStrata() end
-    function methods:SetFrameLevel() end
+    function methods:SetFrameStrata(v) self.frameStrata = v end
+    function methods:SetFrameLevel(v) self.frameLevel = v end
+    function methods:GetFrameLevel() return self.frameLevel or 0 end
+    function methods:SetToplevel(v) self.toplevel = v end
+    function methods:Raise() self.raised = true end
     function methods:SetClampedToScreen() end
     function methods:SetMovable() end
     function methods:EnableMouse() end
@@ -150,6 +161,21 @@ function GetSpecializationRoleByID(specID)
     for _, info in pairs(specs) do if info.id == specID then return info.role end end
     return nil
 end
+function GetLootSpecialization() return state.lootSpecID end
+function SetLootSpecialization(specID)
+    specID = tonumber(specID)
+    if specID == nil then return end
+    if state.lootSpecSetFailures > 0 then
+        state.lootSpecSetFailures = state.lootSpecSetFailures - 1
+        return
+    end
+    if specID ~= 0 then
+        local valid = false
+        for _, info in pairs(specs) do if info.id == specID then valid = true break end end
+        if not valid then return end
+    end
+    state.lootSpecID = specID
+end
 function IsInInstance() return state.inInstance, state.instanceType end
 function GetInstanceInfo()
     return state.instanceName, state.instanceType, state.difficultyID, "Mock Difficulty", 5, 0, false, state.instanceID
@@ -188,9 +214,26 @@ C_ChallengeMode = {
     HasSlottedKeystone = function() return state.slottedKeystone end,
     GetActiveChallengeMapID = function() return state.activeChallengeMapID end,
     GetSlottedKeystoneInfo = function() return state.slottedChallengeMapID end,
-    GetMapTable = function() return {500, 501, 502} end,
-    GetMapUIInfo = function(id) return challengeMaps[id], id end,
+    GetMapTable = function() return {500, 501, 502, 503} end,
+    GetMapUIInfo = function(id)
+        local ids = challengeDungeonIDs[id]
+        return challengeMaps[id], id, 1800, nil, nil, ids and ids.uiMapID or nil
+    end,
 }
+function EJ_GetInstanceForMap(uiMapID)
+    for _, ids in pairs(challengeDungeonIDs) do
+        if ids.uiMapID == uiMapID then return ids.journalID end
+    end
+    return nil
+end
+function EJ_GetInstanceInfo(journalID)
+    for challengeID, ids in pairs(challengeDungeonIDs) do
+        if ids.journalID == journalID then
+            return challengeMaps[challengeID], "", 0, 0, 0, 0, 0, "", true, ids.instanceID, 0, false
+        end
+    end
+    return nil
+end
 C_Traits = {
     GetConfigInfo = function(id)
         if not talentNames[id] then return nil end
@@ -251,18 +294,23 @@ C_EquipmentSet = {
     end,
 }
 
--- Simulate a character upgrading from the stable 1.0 schema. Existing
--- talent/equipment mappings must survive while 1.1 tables are added.
+-- Simulate a character upgrading from 1.1.2. Existing mappings must survive
+-- and legacy mplus:<challengeID> overrides must migrate to the unified
+-- dungeon:<InstanceID> identity.
 LoadoutPilotDB = {
-    schema = 1,
+    schema = 3,
     firstRun = false,
     selectedContext = "world",
+    selectedDungeonKey = "mplus:500",
     autoTalents = true,
     autoGear = true,
     languageOverride = "auto",
     chatMessages = true,
     talentBindings = { ["64:world"] = {configID=101, name="Frost World"} },
     equipmentBindings = { ["64:world"] = {setID=1, name="World Gear"} },
+    dungeonOverrides = {
+        ["mplus:500"] = { name="Voidscar", context="mythicplus", challengeMapID=500, lootSpecID=62 },
+    },
     hud = { enabled=true, locked=false, point="CENTER", relativePoint="CENTER", x=0, y=170 },
     minimap = { hide=false, angle=225 },
 }
@@ -319,7 +367,10 @@ end
 event("ADDON_LOADED", "LoadoutPilot")
 event("PLAYER_LOGIN")
 assert(type(LoadoutPilotDB) == "table", "DB not initialized")
-assert(LoadoutPilotDB.schema == 2, "database schema was not migrated to 2")
+assert(LoadoutPilotDB.schema == 4, "database schema was not migrated to 4")
+assert(LoadoutPilotDB.dungeonOverrides["mplus:500"] == nil, "legacy Mythic+ override key was not removed")
+assert(LoadoutPilotDB.dungeonOverrides["dungeon:10500"] and LoadoutPilotDB.dungeonOverrides["dungeon:10500"].lootSpecID == 62, "legacy Mythic+ override was not migrated to unified dungeon key")
+assert(LoadoutPilotDB.selectedDungeonKey == "dungeon:10500", "selected legacy Mythic+ dungeon was not migrated")
 assert(LoadoutPilotDB.autoSpec == true and LoadoutPilotDB.autoTalents == true and LoadoutPilotDB.autoGear == true, "auto defaults wrong")
 assert(type(LoadoutPilotDB.specBindings) == "table", "spec bindings table missing")
 assert(type(LoadoutPilotDB.dungeonOverrides) == "table", "dungeon overrides table missing")
@@ -328,6 +379,12 @@ assert(LoadoutPilotDB.talentBindings["64:world"] and LoadoutPilotDB.talentBindin
 assert(LoadoutPilotDB.equipmentBindings["64:world"] and LoadoutPilotDB.equipmentBindings["64:world"].setID == 1, "v1.0 equipment mapping was lost during migration")
 assert(LoadoutPilotDB.languageOverride == "auto", "language override default wrong")
 assert(LoadoutPilotDB.chatMessages == true, "chat messages default wrong")
+assert(_G.LoadoutPilotDungeonOverrideFrame.frameStrata == "FULLSCREEN_DIALOG", "dungeon override frame strata changed unexpectedly")
+for _, pickerName in ipairs({"LoadoutPilotSpecPicker", "LoadoutPilotTalentPicker", "LoadoutPilotGearPicker", "LoadoutPilotLootSpecPicker"}) do
+    local picker = _G[pickerName]
+    assert(picker and picker.frameStrata == "FULLSCREEN_DIALOG", pickerName .. " is not on FULLSCREEN_DIALOG strata")
+    assert((picker.frameLevel or 0) > (_G.LoadoutPilotDungeonOverrideFrame.frameLevel or 0), pickerName .. " is not above the dungeon override panel")
+end
 
 -- Existing v1.0 controls continue to work.
 SlashCmdList.LOADOUTPILOT("chat off")
@@ -366,25 +423,57 @@ LoadoutPilotDB.talentBindings["62:mythicplus"] = {configID=301, name="Arcane Def
 -- Voidscar overrides all three fields and switches specialization first.
 -- Existing 1.0 users have no base specialization mapping; configuring the first
 -- dungeon spec override must capture the current Frost spec as the Mythic+ default.
-local voidscarEntry = addon:GetDungeonCatalogEntry("mplus:500")
+local voidscarEntry = addon:GetDungeonCatalogEntry("dungeon:10500")
 assert(voidscarEntry, "Voidscar catalog entry missing before configuration")
 addon:SetDungeonOverrideSpec(voidscarEntry, 62)
 assert(LoadoutPilotDB.specBindings["mythicplus"] and LoadoutPilotDB.specBindings["mythicplus"].specID == 64, "first dungeon spec override did not capture the current Mythic+ default spec")
+assert(LoadoutPilotDB.specBindings["dungeon"] and LoadoutPilotDB.specBindings["dungeon"].specID == 64, "unified dungeon spec override did not capture the regular Dungeon default spec")
 addon:SetDungeonOverrideTalent(voidscarEntry, 302, 62)
 addon:SetDungeonOverrideEquipment(voidscarEntry, 3)
+addon:SetDungeonOverrideLootSpec(voidscarEntry, 62)
 setMythicPlus(500, false) -- pre-start slotted keystone path
 state.selectedTalentBySpec[62] = 301
 state.equippedSet = 1
+state.lootSpecID = 64 -- explicit Frost loot spec before entering the override
 tick(0.6)
 assert(addon:DetectContext() == "mythicplus", "pre-start mythic+ context detection failed")
 local dungeon = addon:GetCurrentDungeonInfo()
-assert(dungeon and dungeon.key == "mplus:500", "Voidscar M+ identity failed")
+assert(dungeon and dungeon.key == "dungeon:10500", "Voidscar unified dungeon identity failed")
 assert(state.specID == 62, "Voidscar did not switch Frost -> Arcane")
 assert(state.selectedTalentBySpec[62] == 302, "Voidscar talent override was not applied after spec switch")
 assert(state.equippedSet == 3, "Voidscar equipment override was not applied")
+assert(state.lootSpecID == 62, "Voidscar loot specialization override was not applied")
+
+-- The same override must apply when the identical dungeon is entered as a
+-- regular dungeon / Mythic 0, without creating a second [Dungeon] record.
+setDungeon("Voidscar", 10500)
+state.specIndex = 1; syncSpec()
+state.selectedTalentBySpec[62] = 301
+state.equippedSet = 1
+tick(0.6)
+assert(addon:DetectContext() == "dungeon", "regular/Mythic 0 context detection failed")
+local sameDungeon = addon:GetCurrentDungeonInfo()
+assert(sameDungeon and sameDungeon.key == "dungeon:10500", "regular dungeon did not reuse the unified dungeon identity")
+assert(state.specID == 62, "unified Voidscar override did not apply outside Mythic+")
+assert(state.selectedTalentBySpec[62] == 302, "unified Voidscar talent override did not apply outside Mythic+")
+assert(state.equippedSet == 3, "unified Voidscar equipment override did not apply outside Mythic+")
+assert(state.lootSpecID == 62, "unified Voidscar loot spec override did not apply outside Mythic+")
+
+-- Compatibility fallback: if the ChallengeMode catalog cannot resolve an
+-- InstanceID up front, the first regular/M0 visit migrates the old M+ key by
+-- matching the current dungeon and ChallengeMode name.
+LoadoutPilotDB.dungeonOverrides["mplus:503"] = {
+    name = "No Journal Dungeon", context = "mythicplus", challengeMapID = 503, specID = 62,
+}
+setDungeon("No Journal Dungeon", 10503)
+state.specIndex = 1; syncSpec()
+tick(0.6)
+assert(LoadoutPilotDB.dungeonOverrides["mplus:503"] == nil, "lazy legacy override migration did not remove the old M+ key")
+assert(LoadoutPilotDB.dungeonOverrides["dungeon:10503"] and LoadoutPilotDB.dungeonOverrides["dungeon:10503"].specID == 62, "lazy legacy override migration did not create the unified dungeon key")
+assert(state.specID == 62, "lazily migrated unified override did not apply on the first regular/M0 visit")
 
 -- RLP overrides only talent. Base spec Frost and default gear must be restored.
-LoadoutPilotDB.dungeonOverrides["mplus:501"] = {
+LoadoutPilotDB.dungeonOverrides["dungeon:10501"] = {
     name = "Ruby Life Pools", context = "mythicplus", challengeMapID = 501,
     talent = {specID=64, configID=202, name="Frost Dungeon"},
 }
@@ -393,6 +482,15 @@ tick(0.6)
 assert(state.specID == 64, "RLP did not restore the default Mythic+ Frost spec")
 assert(state.selectedTalentBySpec[64] == 202, "RLP talent override was not applied")
 assert(state.equippedSet == 2, "RLP did not inherit default Mythic+ equipment")
+assert(state.lootSpecID == 64, "leaving a loot-spec override did not restore the previous loot specialization")
+
+-- Loot spec 0 explicitly means "current specialization" and is a valid override.
+local rlpEntry = addon:GetDungeonCatalogEntry("dungeon:10501")
+assert(rlpEntry, "RLP catalog entry missing")
+addon:SetDungeonOverrideLootSpec(rlpEntry, 0)
+assert(state.lootSpecID == 0, "loot specialization override did not support current-spec mode (0)")
+addon:ClearDungeonOverrideField(rlpEntry, "lootSpecID")
+assert(state.lootSpecID == 64, "clearing the loot specialization override did not restore the previous setting")
 
 -- Another M+ with no override falls back completely to the Mythic+ defaults.
 setMythicPlus(502, true)
@@ -400,6 +498,7 @@ tick(0.6)
 assert(state.specID == 64, "unconfigured M+ did not keep default Frost spec")
 assert(state.selectedTalentBySpec[64] == 203, "unconfigured M+ did not inherit default talent")
 assert(state.equippedSet == 2, "unconfigured M+ did not inherit default gear")
+assert(state.lootSpecID == 64, "unconfigured M+ unexpectedly changed loot specialization")
 
 -- Dungeon-specific spec override can inherit the target spec's base talent and gear.
 LoadoutPilotDB.specBindings["dungeon"] = {specID=64, name="Frost"}
@@ -472,15 +571,17 @@ assert(state.specID == 62, "same-role DPS -> DPS specialization switch was incor
 
 -- Configure a synthetic Tank target for another Mythic+ dungeon. The player is
 -- assigned DPS, so automatic cross-role switching must be blocked.
-LoadoutPilotDB.dungeonOverrides["mplus:502"] = {
+LoadoutPilotDB.dungeonOverrides["dungeon:10502"] = {
     name = "Other Mythic Dungeon", context = "mythicplus", challengeMapID = 502,
     specID = 999,
+    lootSpecID = 999,
 }
 setMythicPlus(502, true)
 state.specIndex = 1; syncSpec()
 state.assignedRole = "DAMAGER"
 tick(0.6)
 assert(state.specID == 64, "role protection allowed DPS -> Tank switch while assigned DPS")
+assert(state.lootSpecID == 999, "role protection incorrectly blocked a Tank loot specialization override")
 local mismatchStatus = addon:GetStatusState()
 assert(string.lower(mismatchStatus):find("role", 1, true) or string.lower(mismatchStatus):find("papel", 1, true), "role mismatch is not visible in status")
 
@@ -496,12 +597,26 @@ state.assignedRole = "DAMAGER"
 LoadoutPilotDB.specBindings["world"] = {specID=999, name="Bulwark"}
 addon:ApplyCurrentRules("smoke-world-cross-role", false)
 assert(state.specID == 999, "World cross-role specialization switch was incorrectly blocked")
+assert(state.lootSpecID == 64, "leaving the dungeon override did not restore the pre-override loot specialization")
 
 -- Restore Frost before PvP regression checks.
 LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
 addon:ApplyCurrentRules("smoke-world-restore", false)
 assert(state.specID == 64, "failed to restore Frost after World role-safety test")
 state.assignedRole = "DAMAGER"
+
+-- A transient loot-spec failure is retried without blocking talents or gear.
+setMythicPlus(500, false)
+state.specIndex = 2; syncSpec() -- already on the dungeon's playing spec, isolate loot retry
+state.lootSpecID = 64
+state.lootSpecSetFailures = 1
+tick(0.6)
+assert(state.lootSpecID == 64, "loot spec failure mock did not preserve the old loot specialization")
+tick(1.1)
+assert(state.lootSpecID == 62, "pending loot specialization was not retried")
+setWorld()
+tick(0.6)
+assert(state.lootSpecID == 64, "loot specialization was not restored after retry scenario")
 
 -- Existing PvP -> World retry still works and does not remain stuck on Applying.
 LoadoutPilotDB.specBindings["pvp"] = {specID=64, name="Frost"}
@@ -533,14 +648,18 @@ addon:UpdateStatusWidget()
 local hudStatus = _G.LoadoutPilotStatusWidget.gear.text or ""
 assert(not hudStatus:find("Applying", 1, true) and not hudStatus:find("Aplicando", 1, true), "HUD remained stuck on Applying after PvP exit")
 
--- Dungeon catalog exposes Blizzard Mythic+ maps plus remembered regular dungeons.
+-- Dungeon catalog exposes one canonical record per dungeon. Seasonal Mythic+
+-- dungeons and remembered regular dungeons must not duplicate the same instance.
 local catalog = addon:GetDungeonCatalog()
-local foundVoidscar, foundNormal = false, false
+local foundVoidscar, foundNormal, legacyMplusCount = false, false, 0
+local voidscarCount = 0
 for _, entry in ipairs(catalog) do
-    if entry.key == "mplus:500" then foundVoidscar = true end
+    if entry.key == "dungeon:10500" then foundVoidscar = true; voidscarCount = voidscarCount + 1 end
     if entry.key == "dungeon:777" then foundNormal = true end
+    if tostring(entry.key):match("^mplus:") then legacyMplusCount = legacyMplusCount + 1 end
 end
-assert(foundVoidscar, "Mythic+ dungeon catalog entry missing")
+assert(foundVoidscar and voidscarCount == 1, "seasonal dungeon was not represented by one unified catalog entry")
 assert(foundNormal, "remembered normal dungeon catalog entry missing")
+assert(legacyMplusCount == 0, "catalog still exposes separate legacy Mythic+ dungeon entries")
 
-print("Smoke test passed: v1.0 regression coverage plus dungeon overrides, role-safe specialization switching, inheritance, Spec -> Talents -> Gear sequencing, combat queue, retry, and PvP exit restoration.")
+print("Smoke test passed: v1.0 regression coverage plus unified Dungeon/Mythic+ overrides, legacy override migration, M0/M+ identity sharing, popup layering, loot-spec overrides/restoration/retry, role-safe playing-spec switching, inheritance, Spec -> Loot Spec -> Talents -> Gear sequencing, combat queue, and PvP exit restoration.")

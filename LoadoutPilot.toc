@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: Loadout Pilot
-## Notes: Automatically switches specialization, saved talent loadouts, and equipment by content, with dungeon-specific overrides.
+## Notes: Automatically switches specialization, loot specialization, saved talent loadouts, and equipment by content, with dungeon-specific overrides.
 ## Author: Thiago Bertuzzi
-## Version: 1.1.1
+## Version: 1.1.2
 ## SavedVariablesPerCharacter: LoadoutPilotDB
 ## X-Category: Interface Enhancements
 ## X-License: MIT

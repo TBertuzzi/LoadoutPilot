@@ -6,6 +6,7 @@ For bug reports, please include:
 - class and current specialization
 - detected content type and dungeon name, if applicable
 - configured target specialization
+- configured loot specialization override, if any
 - configured talent loadout and equipment set
 - whether a dungeon-specific override is active
 - exact steps to reproduce the problem
