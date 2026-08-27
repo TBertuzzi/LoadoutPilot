@@ -36,6 +36,17 @@ local challengeDungeonIDs = {
     [502] = { uiMapID = 20502, journalID = 30502, instanceID = 10502 },
 }
 
+local raidJournal = {
+    [9000] = {
+        uiMapID = 29000,
+        journalInstanceID = 39000,
+        bosses = {
+            { name = "Ula'tek", journalEncounterID = 40001, dungeonEncounterID = 30001 },
+            { name = "Coiled Altar", journalEncounterID = 40002, dungeonEncounterID = 30002 },
+        },
+    },
+}
+
 local state = {
     locale = "ptBR",
     specIndex = 1,
@@ -59,8 +70,18 @@ local state = {
     talentSwitchFailures = 0,
     specSwitchFailures = 0,
     assignedRole = "DAMAGER",
+    grouped = true,
     lootSpecID = 0,
     lootSpecSetFailures = 0,
+    targetNPCID = nil,
+    targetName = nil,
+    targetClassification = "normal",
+    targetLevel = 90,
+    boss1NPCID = nil,
+    boss1Name = nil,
+    uiMapID = nil,
+    selectedJournalInstanceID = nil,
+    selectedJournalTier = 1,
 }
 
 local function syncSpec()
@@ -93,6 +114,7 @@ local function widget()
     function methods:SetAllPoints() end
     function methods:SetTexture(v) self.texture = v end
     function methods:SetText(v) self.text = v end
+    function methods:GetText() return self.text or "" end
     function methods:SetTextColor() end
     function methods:SetJustifyH() end
     function methods:SetJustifyV() end
@@ -107,6 +129,18 @@ local function widget()
     end
     function methods:GetWidth() return self.width or 140 end
     function methods:GetHeight() return self.height or 140 end
+    function methods:SetScrollChild(child) self.scrollChild = child end
+    function methods:UpdateScrollChildRect() end
+    function methods:SetVerticalScroll(v) self.verticalScroll = v or 0 end
+    function methods:GetVerticalScroll() return self.verticalScroll or 0 end
+    function methods:GetVerticalScrollRange()
+        local childHeight = self.scrollChild and self.scrollChild.height or 0
+        return math.max(0, childHeight - (self.height or 140))
+    end
+    function methods:EnableMouseWheel() end
+    function methods:ClearFocus() self.focused = false end
+    function methods:SetFocus() self.focused = true end
+    function methods:HighlightText() self.highlighted = true end
     function methods:GetCenter() return self.centerX or 500, self.centerY or 500 end
     function methods:GetEffectiveScale() return 1 end
     function methods:HookScript(name, fn) self.hooks = self.hooks or {}; self.hooks[name] = fn end
@@ -157,10 +191,47 @@ end
 function GetNumSpecializations() return 3 end
 function UnitClass() return "Mage", "MAGE", 8 end
 function UnitGroupRolesAssigned(unit) return unit == "player" and state.assignedRole or "NONE" end
+function IsInGroup() return state.grouped == true end
+function IsInRaid() return state.grouped == true and state.instanceType == "raid" end
+function GetNumGroupMembers() return state.grouped == true and 5 or 0 end
 function GetSpecializationRoleByID(specID)
     for _, info in pairs(specs) do if info.id == specID then return info.role end end
     return nil
 end
+function UnitExists(unit)
+    if unit == "target" then return state.targetNPCID ~= nil end
+    if unit == "boss1" then return state.boss1NPCID ~= nil end
+    return unit == "player"
+end
+function UnitCreatureID(unit)
+    if unit == "target" then return state.targetNPCID end
+    if unit == "boss1" then return state.boss1NPCID end
+    return nil
+end
+function UnitGUID(unit)
+    local id
+    if unit == "target" then id = state.targetNPCID elseif unit == "boss1" then id = state.boss1NPCID end
+    if not id then return nil end
+    return "Creature-0-0-0-0-" .. tostring(id) .. "-0000000000"
+end
+function UnitName(unit)
+    if unit == "target" then return state.targetName end
+    if unit == "boss1" then return state.boss1Name end
+    if unit == "player" then return "Tester" end
+    return nil
+end
+function UnitClassification(unit)
+    if unit == "target" and state.targetNPCID then return state.targetClassification or "normal" end
+    if unit == "boss1" and state.boss1NPCID then return "worldboss" end
+    return "normal"
+end
+function UnitLevel(unit)
+    if unit == "target" and state.targetNPCID then return state.targetLevel or -1 end
+    if unit == "boss1" and state.boss1NPCID then return -1 end
+    return 90
+end
+function time() return os.time() end
+function date(fmt, stamp) return os.date(fmt, stamp) end
 function GetLootSpecialization() return state.lootSpecID end
 function SetLootSpecialization(specID)
     specID = tonumber(specID)
@@ -220,9 +291,42 @@ C_ChallengeMode = {
         return challengeMaps[id], id, 1800, nil, nil, ids and ids.uiMapID or nil
     end,
 }
+C_Map = {
+    GetBestMapForUnit = function(unit)
+        if unit ~= "player" then return nil end
+        return state.uiMapID
+    end,
+}
 function EJ_GetInstanceForMap(uiMapID)
     for _, ids in pairs(challengeDungeonIDs) do
         if ids.uiMapID == uiMapID then return ids.journalID end
+    end
+    for _, raid in pairs(raidJournal) do
+        if raid.uiMapID == uiMapID then return raid.journalInstanceID end
+    end
+    return nil
+end
+function EJ_SelectInstance(journalInstanceID)
+    state.selectedJournalInstanceID = journalInstanceID
+end
+function EJ_GetNumTiers() return 2 end
+function EJ_GetCurrentTier() return state.selectedJournalTier end
+function EJ_SelectTier(index) state.selectedJournalTier = index end
+function EJ_GetInstanceByIndex(index, isRaid)
+    if isRaid ~= true then return nil end
+    -- Put the synthetic raid on tier 2 so the fallback must scan tiers.
+    if state.selectedJournalTier ~= 2 or index ~= 1 then return nil end
+    local raid = raidJournal[9000]
+    return raid.journalInstanceID, "Coiled Citadel", "", 0, 0, 0, 0, raid.uiMapID, "", true, 9000, 0, true
+end
+function EJ_GetEncounterInfoByIndex(index, journalInstanceID)
+    journalInstanceID = journalInstanceID or state.selectedJournalInstanceID
+    for instanceID, raid in pairs(raidJournal) do
+        if raid.journalInstanceID == journalInstanceID then
+            local boss = raid.bosses[index]
+            if not boss then return nil end
+            return boss.name, "", boss.journalEncounterID, 0, "", raid.journalInstanceID, boss.dungeonEncounterID, instanceID
+        end
     end
     return nil
 end
@@ -339,6 +443,7 @@ local function setWorld()
     state.slottedKeystone = false
     state.activeChallengeMapID = nil
     state.slottedChallengeMapID = nil
+    state.uiMapID = nil
 end
 local function setDungeon(name, instanceID)
     state.inDelve = false
@@ -350,6 +455,7 @@ local function setDungeon(name, instanceID)
     state.slottedKeystone = false
     state.activeChallengeMapID = nil
     state.slottedChallengeMapID = nil
+    state.uiMapID = nil
 end
 local function setMythicPlus(mapID, active)
     state.inDelve = false
@@ -361,17 +467,46 @@ local function setMythicPlus(mapID, active)
     state.slottedKeystone = active ~= true
     state.activeChallengeMapID = active == true and mapID or nil
     state.slottedChallengeMapID = active ~= true and mapID or nil
+    state.uiMapID = challengeDungeonIDs[mapID] and challengeDungeonIDs[mapID].uiMapID or nil
+end
+local function setRaid(name, instanceID)
+    state.inDelve = false
+    state.inInstance = true
+    state.instanceType = "raid"
+    state.instanceName = name or "Test Raid"
+    state.instanceID = instanceID or 9000
+    state.difficultyID = 16
+    state.challenge = false
+    state.slottedKeystone = false
+    state.activeChallengeMapID = nil
+    state.slottedChallengeMapID = nil
+    state.uiMapID = raidJournal[state.instanceID] and raidJournal[state.instanceID].uiMapID or nil
+end
+local function targetBoss(npcID, name)
+    state.targetNPCID = npcID
+    state.targetName = name
+    state.targetClassification = "worldboss"
+    state.targetLevel = -1
+end
+local function clearTarget()
+    state.targetNPCID = nil
+    state.targetName = nil
+    state.targetClassification = "normal"
+    state.targetLevel = 90
 end
 
 -- Load and initialize.
 event("ADDON_LOADED", "LoadoutPilot")
 event("PLAYER_LOGIN")
 assert(type(LoadoutPilotDB) == "table", "DB not initialized")
-assert(LoadoutPilotDB.schema == 4, "database schema was not migrated to 4")
+assert(LoadoutPilotDB.schema == 5, "database schema was not migrated to 5")
 assert(LoadoutPilotDB.dungeonOverrides["mplus:500"] == nil, "legacy Mythic+ override key was not removed")
 assert(LoadoutPilotDB.dungeonOverrides["dungeon:10500"] and LoadoutPilotDB.dungeonOverrides["dungeon:10500"].lootSpecID == 62, "legacy Mythic+ override was not migrated to unified dungeon key")
 assert(LoadoutPilotDB.selectedDungeonKey == "dungeon:10500", "selected legacy Mythic+ dungeon was not migrated")
 assert(LoadoutPilotDB.autoSpec == true and LoadoutPilotDB.autoTalents == true and LoadoutPilotDB.autoGear == true, "auto defaults wrong")
+assert(LoadoutPilotDB.automationModes.spec == "auto" and LoadoutPilotDB.automationModes.talents == "auto" and LoadoutPilotDB.automationModes.gear == "auto" and LoadoutPilotDB.automationModes.lootSpec == "auto", "v2 automation modes were not initialized")
+assert(type(LoadoutPilotDB.raidBossOverrides) == "table" and type(LoadoutPilotDB.knownRaidBosses) == "table", "raid boss tables missing")
+assert(type(LoadoutPilotDB.eventLog) == "table" and #LoadoutPilotDB.eventLog > 0, "event history was not initialized")
 assert(type(LoadoutPilotDB.specBindings) == "table", "spec bindings table missing")
 assert(type(LoadoutPilotDB.dungeonOverrides) == "table", "dungeon overrides table missing")
 assert(type(LoadoutPilotDB.knownDungeons) == "table", "known dungeons table missing")
@@ -528,12 +663,12 @@ assert(state.equippedSet == 2, "removing dungeon override did not preserve defau
 setWorld()
 state.specIndex = 1; syncSpec()
 LoadoutPilotDB.specBindings["world"] = {specID=62, name="Arcane"}
-LoadoutPilotDB.autoSpec = false
+addon:SetAutomationMode("spec", "off", true)
 addon:ApplyCurrentRules("smoke-auto-spec-off", false)
 assert(state.specID == 64, "autoSpec OFF still changed specialization")
 local manualStatus = addon:GetStatusState()
 assert(string.lower(manualStatus):find("manual", 1, true), "manual specialization requirement is not visible in status")
-LoadoutPilotDB.autoSpec = true
+addon:SetAutomationMode("spec", "auto", true)
 LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
 
 -- Specialization changes queue in combat and complete afterwards in the required order.
@@ -585,8 +720,21 @@ assert(state.lootSpecID == 999, "role protection incorrectly blocked a Tank loot
 local mismatchStatus = addon:GetStatusState()
 assert(string.lower(mismatchStatus):find("role", 1, true) or string.lower(mismatchStatus):find("papel", 1, true), "role mismatch is not visible in status")
 
--- Once the actual group role changes to Tank, the same rule becomes compatible
--- and PLAYER_ROLES_ASSIGNED must cause reevaluation.
+-- Leaving the group removes role protection even though the content context is
+-- still Mythic+. This is the solo legacy/manual-entry case: DPS -> Tank must be
+-- allowed because there is no group role to protect. GROUP_ROSTER_UPDATE should
+-- immediately reevaluate the previously blocked rule.
+state.grouped = false
+state.assignedRole = "DAMAGER"
+event("GROUP_ROSTER_UPDATE")
+assert(state.specID == 999, "solo player was incorrectly blocked from a DPS -> Tank specialization switch")
+local soloRoleState = addon:GetRoleProtectionState(999, "mythicplus", 64)
+assert(soloRoleState.protected == false and soloRoleState.mismatch == false, "solo role protection state remained active")
+
+-- Once grouped again with the actual group role set to Tank, the same rule is
+-- also compatible and PLAYER_ROLES_ASSIGNED must cause reevaluation.
+state.specIndex = 1; syncSpec()
+state.grouped = true
 state.assignedRole = "TANK"
 event("PLAYER_ROLES_ASSIGNED")
 assert(state.specID == 999, "compatible Tank role did not allow Tank specialization switch")
@@ -604,6 +752,7 @@ LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
 addon:ApplyCurrentRules("smoke-world-restore", false)
 assert(state.specID == 64, "failed to restore Frost after World role-safety test")
 state.assignedRole = "DAMAGER"
+state.grouped = true
 
 -- A transient loot-spec failure is retried without blocking talents or gear.
 setMythicPlus(500, false)
@@ -662,4 +811,244 @@ assert(foundVoidscar and voidscarCount == 1, "seasonal dungeon was not represent
 assert(foundNormal, "remembered normal dungeon catalog entry missing")
 assert(legacyMplusCount == 0, "catalog still exposes separate legacy Mythic+ dungeon entries")
 
-print("Smoke test passed: v1.0 regression coverage plus unified Dungeon/Mythic+ overrides, legacy override migration, M0/M+ identity sharing, popup layering, loot-spec overrides/restoration/retry, role-safe playing-spec switching, inheritance, Spec -> Loot Spec -> Talents -> Gear sequencing, combat queue, and PvP exit restoration.")
+-- v2 AUTO / NOTIFY / OFF behavior. NOTIFY must not change talents until Apply is confirmed.
+setWorld()
+state.specIndex = 1; syncSpec()
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+LoadoutPilotDB.talentBindings["64:world"] = {configID=101, name="Frost World"}
+state.selectedTalentBySpec[64] = 203
+state.equippedSet = 3
+addon:SetAutomationMode("gear", "off", true)
+addon:SetAutomationMode("talents", "notify", true)
+addon:ApplyCurrentRules("smoke-notify", false)
+assert(state.selectedTalentBySpec[64] == 203, "NOTIFY mode applied talents automatically")
+assert(state.equippedSet == 3, "OFF gear changed while preparing a talent notification")
+addon:UpdateNotification()
+assert(_G.LoadoutPilotNotifyFrame:IsShown(), "NOTIFY mode did not show the reminder")
+assert(_G.LoadoutPilotNotifyFrame.apply and _G.LoadoutPilotNotifyFrame.apply.scripts.OnClick, "NOTIFY Apply button missing")
+_G.LoadoutPilotNotifyFrame.apply.scripts.OnClick()
+assert(state.selectedTalentBySpec[64] == 101, "NOTIFY Apply did not apply the mapped talents")
+assert(state.equippedSet == 3, "confirming a talent notification incorrectly applied OFF gear")
+addon:SetAutomationMode("gear", "auto", true)
+addon:SetAutomationMode("talents", "off", true)
+state.selectedTalentBySpec[64] = 203
+addon:ApplyCurrentRules("smoke-off", false)
+assert(state.selectedTalentBySpec[64] == 203, "OFF mode still applied talents")
+addon:SetAutomationMode("talents", "auto", true)
+assert(state.selectedTalentBySpec[64] == 101, "returning talents to AUTO did not apply the rule")
+
+-- Specialization NOTIFY must keep its confirmation when the forced rule resolves
+-- against the target spec, and the confirmation must survive a temporary failed
+-- switch so the normal retry loop can complete it.
+setWorld()
+state.specIndex = 1; syncSpec()
+LoadoutPilotDB.specBindings["world"] = {specID=62, name="Arcane"}
+LoadoutPilotDB.talentBindings["62:world"] = {configID=301, name="Arcane Default"}
+addon:SetAutomationMode("talents", "off", true)
+addon:SetAutomationMode("spec", "notify", true)
+addon:ApplyCurrentRules("smoke-spec-notify", false)
+assert(state.specID == 64, "Specialization NOTIFY changed spec before confirmation")
+addon:UpdateNotification()
+assert(_G.LoadoutPilotNotifyFrame:IsShown(), "Specialization NOTIFY did not show the reminder")
+_G.LoadoutPilotNotifyFrame.apply.scripts.OnClick()
+assert(state.specID == 62, "Specialization NOTIFY Apply did not switch to the mapped spec")
+assert(not _G.LoadoutPilotNotifyFrame:IsShown(), "notification stayed visible after Apply was accepted")
+
+state.specIndex = 1; syncSpec()
+state.specSwitchFailures = 1
+addon:ApplyCurrentRules("smoke-spec-notify-retry", false)
+addon:UpdateNotification()
+assert(_G.LoadoutPilotNotifyFrame:IsShown(), "Specialization NOTIFY retry scenario did not show the reminder")
+_G.LoadoutPilotNotifyFrame.apply.scripts.OnClick()
+assert(state.specID == 64, "specialization retry scenario unexpectedly succeeded on the forced failure")
+tick(2.1)
+assert(state.specID == 62, "Specialization NOTIFY confirmation was lost before pending retry")
+addon:SetAutomationMode("spec", "auto", true)
+addon:SetAutomationMode("talents", "auto", true)
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+state.specIndex = 1; syncSpec()
+
+-- v2 raid-boss overrides: Midnight hides hostile unit identity inside instances,
+-- so the boss catalog is loaded from Encounter Journal and the configured Loot
+-- Spec activates from the public ENCOUNTER_START encounter ID.
+setRaid("Coiled Citadel", 9000)
+tick(0.6)
+LoadoutPilotDB.specBindings["raid"] = {specID=64, name="Frost"}
+LoadoutPilotDB.talentBindings["64:raid"] = {configID=101, name="Frost World"}
+LoadoutPilotDB.equipmentBindings["64:raid"] = {setID=2, name="PvE Default"}
+state.specIndex = 1; syncSpec()
+state.selectedTalentBySpec[64] = 101
+state.equippedSet = 2
+state.lootSpecID = 64
+
+-- Migrate an override created by an earlier 2.0 test build (NPC-keyed) onto
+-- the stable DungeonEncounterID discovered from the Encounter Journal.
+LoadoutPilotDB.raidBossOverrides["boss:20001"] = {
+    npcID=20001, name="Ula'tek", raidName="Coiled Citadel", lootSpecID=999,
+}
+LoadoutPilotDB.knownRaidBosses["boss:20001"] = {
+    npcID=20001, name="Ula'tek", raidName="Coiled Citadel", verified=true,
+}
+clearTarget()
+local discovered = addon:DiscoverCurrentRaidBossesFromJournal()
+assert(discovered == 2, "Encounter Journal did not load the current raid boss list")
+local ula = addon:GetRaidBossCatalogEntry("encounter:30001")
+local coiled = addon:GetRaidBossCatalogEntry("encounter:30002")
+assert(ula and ula.name == "Ula'tek", "Encounter Journal boss was not keyed by encounter ID")
+assert(coiled and coiled.name == "Coiled Altar", "second Encounter Journal boss was not discovered")
+-- Legacy-map fallback: boss discovery still works when no useful UiMapID is
+-- available by matching GetInstanceInfo() InstanceID across journal tiers.
+state.uiMapID = nil
+state.selectedJournalTier = 1
+assert(addon:GetCurrentRaidJournalInstanceID() == 39000, "legacy raid journal fallback did not resolve by InstanceID")
+assert(state.selectedJournalTier == 1, "legacy journal fallback did not restore the previous Encounter Journal tier")
+state.uiMapID = raidJournal[9000].uiMapID
+assert(LoadoutPilotDB.raidBossOverrides["encounter:30001"] and LoadoutPilotDB.raidBossOverrides["encounter:30001"].lootSpecID == 999, "legacy NPC-keyed boss override was not migrated")
+assert(LoadoutPilotDB.raidBossOverrides["boss:20001"] == nil, "legacy NPC-keyed boss override was not removed after migration")
+
+-- Configuring a boss before pull must not immediately change the playing setup.
+addon:SetRaidBossLootSpec(coiled, 62)
+assert(state.lootSpecID == 64, "configuring a future boss changed loot spec before encounter start")
+assert(state.specID == 64 and state.selectedTalentBySpec[64] == 101 and state.equippedSet == 2, "configuring a boss affected the playing loadout")
+
+-- Encounter start is the safe, public boss identity in Midnight.
+event("ENCOUNTER_START", 30001, "Ula'tek", 16, 20)
+assert(state.lootSpecID == 999, "ENCOUNTER_START did not apply configured boss loot spec")
+assert(state.specID == 64, "boss encounter changed playing specialization")
+assert(state.selectedTalentBySpec[64] == 101, "boss encounter changed talents")
+assert(state.equippedSet == 2, "boss encounter changed equipment")
+assert(LoadoutPilotDB.knownRaidBosses["encounter:30001"], "configured encounter boss was not remembered")
+
+-- A second configured boss can use a different loot spec without touching the playing setup.
+event("ENCOUNTER_START", 30002, "Coiled Altar", 16, 20)
+assert(state.lootSpecID == 62, "second raid boss encounter did not apply its loot override")
+assert(state.specID == 64 and state.selectedTalentBySpec[64] == 101 and state.equippedSet == 2, "boss-to-boss loot change affected the playing loadout")
+
+-- Keep the boss loot spec through encounter end (bonus roll window), then restore on leaving raid.
+event("ENCOUNTER_END", 30002, "Coiled Altar", 16, 20, 1)
+assert(state.lootSpecID == 62, "encounter end restored loot spec too early for bonus rolls")
+setWorld(); clearTarget(); tick(0.6)
+assert(state.lootSpecID == 64, "leaving raid did not restore the loot spec active before boss overrides")
+
+-- Loot-spec NOTIFY should ask at encounter start rather than apply until confirmed.
+setRaid("Coiled Citadel", 9000)
+tick(0.6)
+state.lootSpecID = 64
+addon:SetAutomationMode("lootSpec", "notify", true)
+event("ENCOUNTER_START", 30002, "Coiled Altar", 16, 20)
+assert(state.lootSpecID == 64, "Loot Spec NOTIFY applied automatically")
+addon:UpdateNotification()
+assert(_G.LoadoutPilotNotifyFrame:IsShown(), "boss Loot Spec NOTIFY did not show reminder")
+_G.LoadoutPilotNotifyFrame.apply.scripts.OnClick()
+assert(state.lootSpecID == 62, "boss Loot Spec NOTIFY Apply failed")
+addon:SetAutomationMode("lootSpec", "auto", true)
+setWorld(); clearTarget(); tick(0.6)
+assert(state.lootSpecID == 64, "boss NOTIFY scenario did not restore original loot spec")
+
+-- Explain/source output reports why each field was selected.
+setMythicPlus(500, false)
+local explanation = table.concat(addon:GetRuleExplanationLines(), "\n")
+assert(explanation:find("Voidscar", 1, true), "explain output does not name the active dungeon")
+assert(explanation:find("Dungeon override", 1, true) or explanation:find("Override da masmorra", 1, true), "explain output does not include rule source")
+
+-- Export/import round trip carries rules, boss overrides, and automation modes.
+addon:SetAutomationMode("gear", "notify", true)
+local exported = addon:ExportConfiguration()
+assert(exported:find("LP2|1|", 1, true) == 1, "export header missing")
+assert(exported:find("BOSS|encounter:30001", 1, true), "raid boss override missing from export")
+assert(exported:find("MODE|gear|notify", 1, true), "automation mode missing from export")
+LoadoutPilotDB.raidBossOverrides = {}
+LoadoutPilotDB.dungeonOverrides = {}
+addon:SetAutomationMode("gear", "off", true)
+local imported, importMessage = addon:ImportConfiguration(exported)
+assert(imported == true, "configuration import failed: " .. tostring(importMessage))
+assert(LoadoutPilotDB.raidBossOverrides["encounter:30001"] and LoadoutPilotDB.raidBossOverrides["encounter:30001"].lootSpecID == 999, "boss override was not restored by import")
+assert(LoadoutPilotDB.dungeonOverrides["dungeon:10500"], "dungeon override was not restored by import")
+assert(addon:GetAutomationMode("gear") == "notify", "automation mode was not restored by import")
+
+-- Slash command surface for v2 features.
+SlashCmdList.LOADOUTPILOT("mode gear auto")
+assert(addon:GetAutomationMode("gear") == "auto", "/lpilot mode did not change automation mode")
+SlashCmdList.LOADOUTPILOT("explain")
+setRaid("Coiled Citadel", 9000)
+tick(0.6)
+SlashCmdList.LOADOUTPILOT("bosses")
+assert(_G.LoadoutPilotRaidBossOverrideFrame:IsShown(), "/lpilot bosses did not open raid boss overrides")
+local bossFrame = _G.LoadoutPilotRaidBossOverrideFrame
+local currentRaidKey = addon:GetCurrentRaidCatalogKey()
+assert(currentRaidKey and LoadoutPilotDB.selectedRaidBossRaidKey == currentRaidKey, "raid boss manager did not auto-select the current raid")
+assert(_G.LoadoutPilotRaidPicker, "raid boss manager is missing the paged raid picker")
+assert(_G.LoadoutPilotRaidBossSearchEditBox, "raid boss manager is missing boss search")
+
+-- Saved raids remain browsable after leaving them, and filters scale the boss catalog.
+LoadoutPilotDB.knownRaidBosses["encounter:39001"] = {
+    encounterID = 39001, journalEncounterID = 49001, journalInstanceID = 39100, raidInstanceID = 9100,
+    name = "Archive Keeper", raidName = "Archive Raid", verified = true,
+}
+LoadoutPilotDB.raidBossOverrides["encounter:39001"] = {
+    encounterID = 39001, journalEncounterID = 49001, journalInstanceID = 39100, raidInstanceID = 9100,
+    name = "Archive Keeper", raidName = "Archive Raid", lootSpecID = 62,
+}
+local raidCatalog = addon:GetRaidCatalog()
+assert(#raidCatalog >= 2, "raid catalog did not retain multiple raids")
+assert(raidCatalog[1].isCurrent == true, "current raid was not promoted to the top of the raid picker")
+local archiveMatches = addon:GetFilteredRaidBossCatalog("all", false, "Archive Keeper")
+assert(#archiveMatches == 1 and archiveMatches[1].name == "Archive Keeper", "boss-name search did not filter across saved raids")
+local configuredArchive = addon:GetFilteredRaidBossCatalog("instance:9100", true, "")
+assert(#configuredArchive == 1, "Configured only did not return the configured boss for the selected raid")
+local configuredCount, totalCount = addon:GetRaidBossConfigurationCounts("instance:9100")
+assert(configuredCount == 1 and totalCount == 1, "per-raid configured counter is incorrect")
+local removedArchive = addon:ClearRaidBossOverridesForRaid("instance:9100")
+assert(removedArchive == 1, "clear-this-raid did not remove the selected raid override")
+assert(LoadoutPilotDB.knownRaidBosses["encounter:39001"], "clear-this-raid removed the boss catalog entry")
+assert(LoadoutPilotDB.raidBossOverrides["encounter:30001"], "clear-this-raid removed an override from another raid")
+
+-- Raid-boss pagination must not snap back to the selected boss page.
+for i = 1, 20 do
+    local key = "boss:" .. tostring(31000 + i)
+    LoadoutPilotDB.knownRaidBosses[key] = {
+        npcID = 31000 + i,
+        name = string.format("Pagination Boss %02d", i),
+        raidName = "Coiled Citadel",
+        raidInstanceID = 9000,
+        journalInstanceID = 39000,
+        verified = true,
+    }
+end
+clearTarget()
+LoadoutPilotDB.selectedRaidBossRaidKey = currentRaidKey
+local currentBossCatalog = addon:GetFilteredRaidBossCatalog(currentRaidKey, false, "")
+assert(#currentBossCatalog >= 17, "raid boss pagination test did not create enough bosses in the selected raid")
+LoadoutPilotDB.selectedRaidBossKey = currentBossCatalog[1].key
+bossFrame.page = 1
+bossFrame.ensureSelectedVisible = true
+addon:UpdateRaidBossOverrideFrame()
+assert(bossFrame.page == 1, "raid boss list did not start on selected boss page")
+bossFrame.next.scripts.OnClick()
+assert(bossFrame.page == 2, "raid boss Next pagination snapped back to selected boss page")
+bossFrame.next.scripts.OnClick()
+assert(bossFrame.page == 3, "raid boss Next pagination could not advance to third page")
+bossFrame.prev.scripts.OnClick()
+assert(bossFrame.page == 2, "raid boss Previous pagination did not move back one page")
+
+SlashCmdList.LOADOUTPILOT("log")
+assert(_G.LoadoutPilotTransferFrame:IsShown(), "/lpilot log did not open the event history window")
+assert(_G.LoadoutPilotTransferScrollFrame, "event history window is missing its scroll frame")
+assert(_G.LoadoutPilotTransferScrollFrame.scrollChild == _G.LoadoutPilotTransferEditBox, "event history edit box is not attached to the scroll frame")
+assert((_G.LoadoutPilotTransferScrollFrame.verticalScroll or 0) >= 0, "event history scroll position was not initialized")
+assert(#LoadoutPilotDB.eventLog > 0, "event history remained empty after runtime activity")
+
+-- Routine reevaluation events must not flood the persistent history.
+LoadoutPilotDB.eventLog = {}
+for _ = 1, 12 do addon:ApplyCurrentRules("role-assigned", false) end
+local applyRows = 0
+local debugRows = 0
+for _, row in ipairs(LoadoutPilotDB.eventLog) do
+    if row.kind == "apply" then applyRows = applyRows + 1 end
+    if row.kind == "debug" then debugRows = debugRows + 1 end
+end
+assert(applyRows == 0, "routine ApplyCurrentRules reevaluations leaked into event history")
+assert(debugRows == 0, "debug rows were recorded while chat debug was disabled")
+assert(#LoadoutPilotDB.eventLog <= 3, "routine role-assigned reevaluations produced noisy event history")
+
+print("Smoke test passed: Loadout Pilot 2.0 regression coverage plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")

@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.0.0 - 2026-08-27
+- Polished Raid Bosses rows: boss and raid now use separate lines, with the Loot Spec badge isolated on the right so long localized names stay inside the button.
+- Standardized all **HUD & Interface** action buttons to the same width, using the widest localized control as the baseline for a cleaner aligned column.
+- Fixed PT-BR Raid Boss filter controls overlapping by giving Current Raid and Configured Only dedicated full-width rows.
+
+- Added Raid Boss Loot Spec Overrides using Blizzard's Encounter Journal and stable `DungeonEncounterID` identities.
+- Reworked Raid Boss Overrides into a scalable **Raid -> Boss -> Loot Spec** browser with automatic current-raid selection.
+- Added **All raids**, raid picker pagination, boss search, **Configured only**, configured/total counters, and visible Loot Spec badges in the boss list.
+- Saved raid/boss rules remain available after leaving a raid, and the selected raid can have all of its overrides cleared with an explicit confirmation without deleting the catalog.
+- Boss rules activate from `ENCOUNTER_START`, avoiding Midnight's secret hostile-unit name/GUID/ID restrictions inside instances.
+- Added legacy-raid Encounter Journal fallback that matches the public InstanceID across journal tiers when the current UiMapID cannot resolve the raid directly.
+- Migrates matching NPC/name-keyed overrides from early 2.0 test builds onto stable encounter IDs.
+- Boss targeting no longer drives automation; target changes alone never alter Loot Spec, playing spec, talents, or gear.
+- Raid boss discovery now lists real journal encounters instead of raid adds/helpers.
+- Fixed Raid Bosses pagination so Previous/Next no longer snap back to the page containing the selected boss.
+- Added independent AUTO / NOTIFY / OFF modes for Specialization, Talents, Gear, and Loot Spec.
+- Added a compact Apply / Ignore notification flow for NOTIFY mode.
+- Fixed NOTIFY Apply for specialization and preserved confirmations across temporary retry states.
+- Reorganized the main UI into General, Contexts, Dungeons, Raid Bosses, Automation, HUD & Interface, and Advanced sections.
+- Added rule-source tracking and `/lpilot explain`.
+- Added same-class Loadout Pilot configuration import/export.
+- Added rolling event history and `/lpilot log`.
+- Refined event history to keep meaningful state changes, compact duplicate events, and exclude routine reevaluation noise.
+- Debug traces are stored only while **Chat debug** is enabled; the useful event history remains available independently.
+- Event History now uses a clipped, scrollable text viewport and opens on recent entries without auto-selecting the entire log.
+- Added confirmed Spec/Talent/Gear/Loot Spec changes, queued combat actions, role blocks, and failures as focused diagnostic events.
+- Expanded HUD/status details with rule sources and raid boss information.
+- Preserved unified dungeon overrides across Normal, Heroic, Mythic 0, and Mythic+.
+- Preserved role-safe specialization switching, PvP recovery, and combat-safe retries.
+- Fixed role protection so solo players in Dungeon/Mythic+/Raid contexts can switch across roles (for example Retribution DPS -> Protection Tank); protection remains active only when a group role actually needs to be preserved.
+- Added GROUP_ROSTER_UPDATE reevaluation so joining/leaving a group immediately refreshes role safety.
+- Migrated existing v1.x automation ON/OFF settings into the new automation-mode model.
+- Improved PT-BR terminology by using **chefe/chefes** consistently in the raid-boss UI while slash commands remain English.
+- Replaced unsupported arrow/bullet/checkmark glyphs in the in-game UI with WoW-font-safe ASCII separators.
+
 ## 1.1.2 - 2026-08-24
 
 Dungeon override UX, loot specialization, and unified dungeon identity update.

@@ -3,13 +3,14 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.1.2"
+VERSION = "2.0.0"
 INTERFACE = "120100"
+SCHEMA = 5
 REQUIRED = [
     "LoadoutPilot.toc", "Localization.lua", "Data.lua", "Core.lua",
     "README.md", "CHANGELOG.md", "LICENSE", "TESTING.md",
     "CURSEFORGE_DESCRIPTION.md", "CURSEFORGE_SUBMISSION.md", "PUBLISHING.md",
-    "SUPPORT.md", "RELEASE_NOTES_v1.1.2.md",
+    "SUPPORT.md", "RELEASE_NOTES_v2.0.0.md",
     "Media/MinimapIcon.tga",
 ]
 
@@ -30,14 +31,14 @@ for expected in (
 data = (ROOT / "Data.lua").read_text(encoding="utf-8")
 for expected in (
     f'Data.version = "{VERSION}"',
-    "Data.schema = 4",
+    f"Data.schema = {SCHEMA}",
 ):
     if expected not in data:
         errors.append(f"Data.lua missing: {expected}")
 
 core = (ROOT / "Core.lua").read_text(encoding="utf-8")
 for snippet in (
-    # Existing context and switching behavior.
+    # Context detection and existing switching behavior.
     "C_PartyInfo.IsDelveInProgress",
     "C_ChallengeMode.IsChallengeModeActive",
     "C_ChallengeMode.HasSlottedKeystone",
@@ -48,46 +49,82 @@ for snippet in (
     "pending-talent-retry",
     "PVP_MATCH_COMPLETE",
     "UPDATE_BATTLEFIELD_STATUS",
-    # 1.1 specialization automation.
+    # Specialization / role safety.
     "C_SpecializationInfo.SetSpecialization",
     "UnitGroupRolesAssigned",
     "GetSpecializationRoleByID",
     "GetRoleProtectionState",
+    "GetPlayerGroupedState",
     "PLAYER_ROLES_ASSIGNED",
+    "GROUP_ROSTER_UPDATE",
     "ROLE_MISMATCH_STATUS",
-    # 1.1.2 loot specialization overrides and popup layering.
+    # Loot specialization and unified dungeon overrides.
     "GetLootSpecialization",
     "SetLootSpecialization",
     "PLAYER_LOOT_SPEC_UPDATED",
-    "lootSpecID",
     "SetDungeonOverrideLootSpec",
     "SyncLootSpecializationRule",
-    "LoadoutPilotLootSpecPicker",
-    "PICKER_FRAME_LEVEL",
-    'frame:SetFrameStrata("FULLSCREEN_DIALOG")',
-    "TrySwitchSpecialization",
-    "pending-spec-retry",
-    "specBindings",
-    "autoSpec",
-    # 1.1 dungeon overrides and identity.
+    "MigrateUnifiedDungeonOverrides",
     "GetCurrentDungeonInfo",
     "GetDungeonCatalog",
     "GetChallengeDungeonIdentity",
-    "EJ_GetInstanceForMap",
-    "EJ_GetInstanceInfo",
-    "MigrateUnifiedDungeonOverrides",
-    "GetActiveChallengeMapID",
-    "GetSlottedKeystoneInfo",
-    '"mplus:"',
-    '"dungeon:"',
-    '"dungeon:"',
     "dungeonOverrides",
     "knownDungeons",
-    "ResolveRuntimeRule",
-    "CreateDungeonOverrideFrame",
-    "DUNGEON_OVERRIDES",
-    'command == "overrides"',
-    'command == "spec"',
+    # 2.0 raid boss loot-spec rules.
+    "GetCurrentRaidJournalInstanceID",
+    "DiscoverCurrentRaidBossesFromJournal",
+    "EJ_GetInstanceForMap",
+    "EJ_GetEncounterInfoByIndex",
+    "EJ_GetInstanceByIndex",
+    "SetRaidBossLootSpec",
+    "HandleEncounterStart",
+    "HandleEncounterEnd",
+    "CleanupKnownRaidBosses",
+    "ensureSelectedVisible",
+    "raidBossOverrides",
+    "knownRaidBosses",
+    '"ENCOUNTER_START"',
+    '"ENCOUNTER_END"',
+    # 2.0 automation modes and notify UI.
+    "automationModes",
+    "SetAutomationMode",
+    "CycleAutomationMode",
+    "GetNotificationRecommendation",
+    "CreateNotifyFrame",
+    "LoadoutPilotNotifyFrame",
+    "identityKey",
+    "IsExplicitApplyKind",
+    '"notify"',
+    # 2.0 explainability, transfer, event history, and UI.
+    "GetRuleExplanationLines",
+    "PrintExplain",
+    "AppendEventLog",
+    "CompactEventLog",
+    "LogResolvedRuleEvent",
+    "GetRecentEventLogText",
+    "ExportConfiguration",
+    "ImportConfiguration",
+    "CreateTransferFrame",
+    "LoadoutPilotTransferScrollFrame",
+    "SetScrollChild",
+    "RefreshTransferScroll",
+    "CreateRaidBossOverrideFrame",
+    "GetRaidCatalog",
+    "GetFilteredRaidBossCatalog",
+    "GetRaidBossConfigurationCounts",
+    "ClearRaidBossOverridesForRaid",
+    "LoadoutPilotRaidPicker",
+    "LoadoutPilotRaidBossSearchEditBox",
+    "selectedRaidBossRaidKey",
+    "raidBossConfiguredOnly",
+    "SetMainPage",
+    "local hudButtonWidth = 220",
+    'command == "explain"',
+    'command == "mode"',
+    'command == "bosses"',
+    'command == "export"',
+    'command == "import"',
+    'command == "log"',
     # Existing UI/QoL.
     "CreateMinimapButton",
     "LoadoutPilotMinimapButton",
@@ -96,29 +133,30 @@ for snippet in (
     "ResetPositions",
     "chatMessages",
     "LayoutStatusWidget",
-    "Interface\\\\AddOns\\\\LoadoutPilot\\\\Media\\\\MinimapIcon",
+    r"Interface\\AddOns\\LoadoutPilot\\Media\\MinimapIcon",
 ):
     if snippet not in core:
         errors.append(f"Expected implementation marker missing: {snippet}")
 
 localization = (ROOT / "Localization.lua").read_text(encoding="utf-8")
 for snippet in (
-    "LANGUAGE_AUTO",
-    "LANGUAGE_PTBR",
-    "LANGUAGE_EN",
-    "SPECIALIZATION_OVERRIDE",
-    "DUNGEON_OVERRIDES_DESCRIPTION",
-    "DUNGEON_SCOPE_LABEL",
-    "DUNGEON_FALLBACK_UNIFIED",
-    "INHERIT_DEFAULT",
-    "SPEC_MANUAL_REQUIRED",
-    "GROUP_ROLE",
-    "TARGET_ROLE",
+    "SLOGAN_V2",
+    "MODE_AUTO", "MODE_NOTIFY", "MODE_OFF",
+    "AUTOMATION_LOOTSPEC",
+    "NOTIFY_TITLE", "NOTIFY_APPLY", "NOTIFY_IGNORE",
+    "SOURCE_RAID_BOSS_OVERRIDE",
+    "EXPLAIN_TITLE",
+    "RAID_BOSS_OVERRIDES",
+    "RAID_BOSS_TARGET_BEHAVIOR",
+    "ALL_RAIDS", "CURRENT_RAID_BUTTON", "SEARCH_BOSS",
+    "CONFIGURED_ONLY_ON", "RAID_BOSS_CONFIGURED_COUNT",
+    "CLEAR_RAID_OVERRIDES",
+    "EXPORT_CONFIGURATION", "IMPORT_CONFIGURATION",
+    "EVENT_LOG",
+    "PAGE_GENERAL", "PAGE_CONTEXTS", "PAGE_DUNGEONS", "PAGE_RAID_BOSSES",
+    "PAGE_AUTOMATION", "PAGE_HUD", "PAGE_ADVANCED",
     "ROLE_MISMATCH_STATUS",
     "LOOT_SPEC_OVERRIDE",
-    "CHOOSE_LOOT_SPEC_OVERRIDE",
-    "CURRENT_SPECIALIZATION_LOOT",
-    "NO_LOOT_OVERRIDE_ACTIVE",
 ):
     if snippet not in localization:
         errors.append(f"Expected localization marker missing: {snippet}")
@@ -130,16 +168,17 @@ for forbidden in (
     if forbidden in core:
         errors.append(f"Combat automation API must not be used: {forbidden}")
 
-for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v1.1.2.md"):
+for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v2.0.0.md"):
     path = ROOT / rel
     if path.is_file() and "buymeacoffee.com/bertuzzi" not in path.read_text(encoding="utf-8"):
         errors.append(f"Support link missing from {rel}")
 
-if f"## {VERSION}" not in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"):
+changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+if f"## {VERSION}" not in changelog:
     errors.append(f"CHANGELOG missing {VERSION}")
 
 if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)
 
-print("Static validation passed.")
+print("Static validation passed for Loadout Pilot 2.0.0.")

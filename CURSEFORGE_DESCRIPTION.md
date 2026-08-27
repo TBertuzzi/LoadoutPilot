@@ -1,64 +1,96 @@
 # Loadout Pilot
 
-**Configure once. Let your loadout follow what you are doing.**
+**Set your rules. Play your content. Loadout Pilot handles the rest.**
 
-Loadout Pilot automatically associates the specialization, talent loadouts, and equipment sets you already use in World of Warcraft with the content you enter.
+Loadout Pilot is a World of Warcraft Retail addon that automatically follows the content you are playing with the specialization, Loot Spec, saved Blizzard talent loadouts, and equipment sets **you already chose**.
 
-## Supported contexts
+It does not try to calculate BiS or decide the best build for you. You define the rules once; Loadout Pilot remembers when to use them.
 
-- World
-- Delve
-- Dungeon
-- Mythic+
-- Raid
-- PvP (Battlegrounds and Arenas)
+## Loadout Pilot 2.0
 
-## Dungeon-specific rules
+### Raid Boss Loot Spec Overrides
 
-Version 1.1 adds optional per-dungeon overrides. Starting with 1.1.2, each dungeon has **one shared override** that applies in Normal, Heroic, Mythic 0, and Mythic+.
+Pre-plan a Loot Spec for individual raid bosses. Loadout Pilot loads the current raid's bosses from Blizzard's **Encounter Journal** and applies the configured Loot Spec when that encounter starts.
+
+The boss manager is organized by raid and keeps saved rules for raids you have already configured. The current raid is selected automatically, while **All raids**, boss search, **Configured only**, per-raid progress counters, and a paged raid picker make large long-term catalogs easy to manage.
+
+**Raid-boss automation changes Loot Spec only.** Your playing specialization, talents, and gear continue to follow the normal Raid rule.
+
+Midnight hides hostile creature identity from addon code inside instances, so Loadout Pilot deliberately uses public Encounter Journal / `ENCOUNTER_START` IDs instead of relying on the player's target.
+
+### AUTO / NOTIFY / OFF
+
+Choose behavior independently for:
+
+- Specialization
+- Talents
+- Gear
+- Loot Spec
+
+**AUTO** applies the rule automatically when WoW allows it.  
+**NOTIFY** shows an Apply / Ignore reminder.  
+**OFF** leaves that category alone.
+
+### Explainable rules
+
+The new General page shows the resolved rule and where every field came from. `/lpilot explain` prints the same information for troubleshooting.
+
+### Import / Export and Event History
+
+Back up or transfer rules between characters of the same class, and copy a short event history when reporting a reproducible issue.
+
+## Dungeon Overrides
+
+Each dungeon has one override shared across Normal, Heroic, Mythic 0, and Mythic+.
+
+Dungeon-specific fields can independently set:
+
+- Playing specialization
+- Loot specialization
+- Talent loadout
+- Equipment set
+
+Fields left on **Inherit** use the appropriate general Dungeon or Mythic+ fallback.
 
 Example:
 
-- **Dungeon default** -> Frost + Dungeon Build + PvE Default
-- **Mythic+ default** -> Frost + M+ Default + PvE Default
-- **Voidscar override** -> Unholy + Voidscar Build + inherited PvE gear
+**Dungeon default:** Frost + Dungeon Build + PvE Gear  
+**Mythic+ default:** Frost + M+ Build + PvE Gear  
+**Altar of Fangs:** Unholy + Blood Loot Spec + Altar Build + Inherit Gear
 
-The Voidscar override is reused at every dungeon difficulty. Fields left on **Inherit** use the correct default for the current activity: Dungeon outside a keystone run, Mythic+ during a keystone run.
+## Other features
 
-Specialization, loot specialization, talent loadout, and equipment can each be overridden independently.
+- World, Delve, Dungeon, Mythic+, Raid, and PvP contexts.
+- Works with every Retail class and specialization.
+- Role-safe playing-spec automation in grouped content, while solo players remain free to switch across DPS/Tank/Healer roles.
+- Mythic+ detection when a keystone is slotted, before the timer starts when possible.
+- Combat/transition queue and retry behavior.
+- PvP -> World recovery for mapped talents and equipment.
+- Compact adaptive HUD with detailed hover information.
+- Custom minimap button.
+- English and Brazilian Portuguese.
+- `/lpilot apply`, `/lpilot status`, `/lpilot explain`, `/lpilot overrides`, `/lpilot bosses`, `/lpilot log`, import/export, and more.
 
-## Highlights
+## Safe automation
 
-- Any Retail class and specialization
-- Optional specialization mapping for every general content context
-- Automatic **Specialization -> Loot Spec -> Talents -> Equipment** sequencing
-- One shared per-dungeon override across Normal, Heroic, Mythic 0, and Mythic+, including independent loot-spec selection
-- Automatic talent-loadout switching when allowed by WoW
-- Automatic equipment-set switching outside combat
-- Combat-safe queue and transition retry logic
-- Reliable PvP -> World recovery for talents and equipment
-- Mythic+ detection before the timer starts when a keystone is slotted
-- Compact adaptive HUD showing talents, equipment, and current status
-- Hover details for current/target spec, loot spec, context, active dungeon override, talents, gear, and status
-- Custom minimap button
-- Manual Apply fallback when the client temporarily blocks a change
-- English and Brazilian Portuguese with an in-addon language selector
-- Optional routine chat notifications
-- Manual-state indication when automation is disabled
-- One-click reset for HUD and minimap-button positions
+Loadout Pilot does not cast abilities or automate combat. It uses Blizzard-supported player-configuration APIs and does not bypass restrictions on specialization, talent, Loot Spec, or equipment changes.
 
-Loadout Pilot does **not** cast abilities and does not automate combat. It respects Blizzard restrictions and only requests supported player configuration changes.
+Loadout Pilot does not include raid/dungeon loot tables, calculate BiS, or choose an optimal Loot Spec for you.
 
-### Per-dungeon loot specialization
+## Compatibility
 
-A dungeon override can select a loot specialization independently from the specialization used to play. For example, stay Frost DPS while using Blood loot for one dungeon. Choosing **Current specialization** uses WoW's current-spec loot mode, and leaving the field on **No override** leaves the player's loot setting untouched. When a temporary dungeon loot override ends, Loadout Pilot restores the loot specialization that was active before it.
+- World of Warcraft Retail
+- Midnight 12.1.0
+- Interface 120100
 
-### Role-safe specialization switching
+## Feedback
 
-For Dungeon, Mythic+, Raid, and PvP content, Loadout Pilot compares the player's protected group role with the target specialization role. Same-role switches remain automatic, while incompatible Tank/Healer/DPS changes are blocked instead of silently changing the player's group role. World and Delve rules remain unrestricted.
+Bug reports, real-world testing, and feature suggestions are very welcome. The addon has already evolved substantially thanks to community feedback.
+
+Source code is available on GitHub under **TBertuzzi/LoadoutPilot**.
 
 ## Support development
 
-If you enjoy Loadout Pilot and would like to support continued development:
+If Loadout Pilot is useful to you and you would like to support continued development:
 
-[Buy Me a Coffee - bertuzzi](https://buymeacoffee.com/bertuzzi)
+https://buymeacoffee.com/bertuzzi

@@ -1,20 +1,34 @@
-# CurseForge submission - Loadout Pilot 1.1.2
+# CurseForge Submission - Loadout Pilot 2.0.0
 
-- **Project name:** Loadout Pilot
-- **Game:** World of Warcraft
-- **Project type / class:** Addons
-- **Game flavor:** Retail
-- **License:** MIT
-- **Recommended file channel while testing:** Beta
-- **Version:** 1.1.2
-- **Supported patch:** Midnight 12.1.0 / Interface 120100
-- **Description:** use `CURSEFORGE_DESCRIPTION.md`
-- **Support / donation:** https://buymeacoffee.com/bertuzzi
+## Display name
 
-## Suggested summary
+Loadout Pilot 2.0.0
 
-Automatically switch specialization, loot specialization, talent loadouts, and equipment by content, with one shared override per dungeon and role-safe playing-spec changes.
+## Release type
 
-## File
+Release
 
-Upload `LoadoutPilot-v1.1.2-CurseForge.zip` after live testing. Upload as Release after the dropdown-layering, loot-specialization, and shared Dungeon/Mythic+ override scenarios in `TESTING.md` pass in the live client.
+## Summary
+
+Set your rules and let Loadout Pilot manage spec, Loot Spec, talents and gear by content, with unified dungeon overrides and raid-boss Loot Spec rules.
+
+## Primary category
+
+Class
+
+## Suggested additional categories
+
+- HUDs
+- PvP (optional; the addon supports PvP but is not PvP-only)
+
+Avoid Plugins unless CurseForge is using that category in a broader sense; Loadout Pilot is standalone.
+
+## Upload file
+
+Use `LoadoutPilot-v2.0.0-CurseForge.zip`. The archive contains exactly one top-level `LoadoutPilot` folder.
+
+## Compatibility
+
+- Retail
+- Midnight 12.1.0
+- Interface 120100
