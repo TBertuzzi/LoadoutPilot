@@ -54,6 +54,8 @@ local state = {
     specName = "Frost",
     selectedTalentBySpec = { [64] = 101, [62] = 301 },
     inDelve = false,
+    delveComplete = false,
+    activeDelve = false,
     inInstance = false,
     instanceType = "none",
     instanceName = "Open World",
@@ -278,7 +280,11 @@ C_SpecializationInfo = {
 }
 C_PartyInfo = {
     IsDelveInProgress = function() return state.inDelve end,
+    IsDelveComplete = function() return state.delveComplete end,
     IsChallengeModeActive = function() return state.challenge end,
+}
+C_DelvesUI = {
+    HasActiveDelve = function() return state.activeDelve end,
 }
 C_ChallengeMode = {
     IsChallengeModeActive = function() return state.challenge end,
@@ -435,6 +441,8 @@ local function tick(seconds)
 end
 local function setWorld()
     state.inDelve = false
+    state.delveComplete = false
+    state.activeDelve = false
     state.inInstance = false
     state.instanceType = "none"
     state.instanceName = "Open World"
@@ -445,8 +453,26 @@ local function setWorld()
     state.slottedChallengeMapID = nil
     state.uiMapID = nil
 end
+local function setDelve(inProgress, complete, hasActiveDelve)
+    state.inDelve = inProgress == true
+    state.delveComplete = complete == true
+    state.activeDelve = hasActiveDelve ~= false
+    state.inInstance = true
+    state.instanceType = "scenario"
+    state.instanceName = "Test Delve"
+    state.instanceID = 12001
+    state.difficultyID = 0
+    state.challenge = false
+    state.slottedKeystone = false
+    state.activeChallengeMapID = nil
+    state.slottedChallengeMapID = nil
+    state.uiMapID = 22001
+end
+
 local function setDungeon(name, instanceID)
     state.inDelve = false
+    state.delveComplete = false
+    state.activeDelve = false
     state.inInstance = true
     state.instanceType = "party"
     state.instanceName = name
@@ -459,6 +485,8 @@ local function setDungeon(name, instanceID)
 end
 local function setMythicPlus(mapID, active)
     state.inDelve = false
+    state.delveComplete = false
+    state.activeDelve = false
     state.inInstance = true
     state.instanceType = "party"
     state.instanceName = challengeMaps[mapID]
@@ -471,6 +499,8 @@ local function setMythicPlus(mapID, active)
 end
 local function setRaid(name, instanceID)
     state.inDelve = false
+    state.delveComplete = false
+    state.activeDelve = false
     state.inInstance = true
     state.instanceType = "raid"
     state.instanceName = name or "Test Raid"
@@ -548,6 +578,43 @@ SlashCmdList.LOADOUTPILOT("apply")
 assert(state.specID == 64, "world apply changed spec unexpectedly")
 assert(state.selectedTalentBySpec[64] == 101, "world talent apply failed")
 assert(state.equippedSet == 1, "world gear apply failed")
+
+-- 2.0.1 Delve completion regression: completing a Delve must NOT switch to
+-- World while the player is still inside collecting reward chests. The Delve
+-- rule stays active until the player actually leaves the scenario.
+LoadoutPilotDB.specBindings["world"] = {specID=64, name="Frost"}
+LoadoutPilotDB.specBindings["delve"] = {specID=62, name="Arcane"}
+LoadoutPilotDB.talentBindings["62:delve"] = {configID=301, name="Arcane Default"}
+setDelve(true, false, true)
+tick(0.6)
+assert(addon:DetectContext() == "delve", "active Delve context detection failed")
+assert(state.specID == 62, "Delve mapping did not switch to the configured specialization")
+
+-- The normal progress flag drops at completion. HasActiveDelve must keep the
+-- context on Delve through the reward phase and prevent World-spec retries.
+setDelve(false, true, true)
+tick(0.6)
+assert(addon:DetectContext() == "delve", "completed Delve was misdetected as World during reward phase")
+assert(state.specID == 62, "completed Delve incorrectly restored the World specialization")
+tick(2.1)
+assert(state.specID == 62, "completed Delve queued/retried an incorrect World specialization switch")
+
+-- If HasActiveDelve is unavailable/false, IsDelveComplete remains a guarded
+-- fallback while physically inside the scenario.
+setDelve(false, true, false)
+assert(addon:DetectContext() == "delve", "completed Delve fallback detection failed")
+
+-- Only leaving the scenario may restore World.
+setWorld()
+tick(0.6)
+assert(addon:DetectContext() == "world", "leaving a Delve did not restore World context")
+assert(state.specID == 64, "World specialization was not restored after leaving the Delve")
+
+-- A stale completion flag outside any instance must never pin the player to Delve.
+state.delveComplete = true
+state.activeDelve = false
+assert(addon:DetectContext() == "world", "stale Delve completion flag leaked into World context")
+state.delveComplete = false
 
 -- General Mythic+ defaults: Frost + default M+ talent + PvE gear.
 LoadoutPilotDB.talentBindings["64:mythicplus"] = {configID=203, name="Frost M+ Default"}
@@ -1051,4 +1118,4 @@ assert(applyRows == 0, "routine ApplyCurrentRules reevaluations leaked into even
 assert(debugRows == 0, "debug rows were recorded while chat debug was disabled")
 assert(#LoadoutPilotDB.eventLog <= 3, "routine role-assigned reevaluations produced noisy event history")
 
-print("Smoke test passed: Loadout Pilot 2.0 regression coverage plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")
+print("Smoke test passed: Loadout Pilot 2.0.1 regression coverage including completed-Delve reward-phase retention plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")

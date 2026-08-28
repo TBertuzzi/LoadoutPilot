@@ -1,4 +1,4 @@
-# Loadout Pilot 2.0 Test Plan
+# Loadout Pilot 2.0.1 Test Plan
 
 ## Automated coverage
 
@@ -11,6 +11,7 @@ The smoke test exercises:
 - Role-safe playing specialization switching, including solo cross-role rules.
 - Combat queue/retry behavior.
 - PvP -> World regression behavior.
+- Delve active -> completed reward phase -> World exit regression behavior.
 - Raid boss discovery from the Encounter Journal.
 - Stable DungeonEncounterID rules and migration from early NPC-keyed test rules.
 - Raid-boss catalog cleanup/deduplication and Previous/Next pagination.
@@ -24,7 +25,18 @@ The smoke test exercises:
 - Configuration export/import round trip.
 - Event history and new slash commands.
 
-## Required live-client validation for 2.0
+## Required live-client validation for 2.0.1
+
+### Delve completion regression (2.0.1)
+
+1. Configure different **World** and **Delve** specializations/loadouts.
+2. Enter a Delve and confirm the Delve rule is active.
+3. Complete the Delve, but **do not leave**.
+4. Walk between the reward chests and stop several times while looting.
+5. Confirm the HUD/context remains **Delve** and Loadout Pilot does not attempt to restore the World specialization, talents, gear, or Loot Spec.
+6. Leave the Delve.
+7. Confirm the context changes to **World** only after leaving and the World rule is then restored.
+
 
 Automated mocks cannot prove Blizzard's live protected-state behavior or visual layering. Test these in Retail before marking 2.0 as a stable Release.
 

@@ -3,14 +3,14 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 INTERFACE = "120100"
 SCHEMA = 5
 REQUIRED = [
     "LoadoutPilot.toc", "Localization.lua", "Data.lua", "Core.lua",
     "README.md", "CHANGELOG.md", "LICENSE", "TESTING.md",
     "CURSEFORGE_DESCRIPTION.md", "CURSEFORGE_SUBMISSION.md", "PUBLISHING.md",
-    "SUPPORT.md", "RELEASE_NOTES_v2.0.0.md",
+    "SUPPORT.md", "RELEASE_NOTES_v2.0.1.md",
     "Media/MinimapIcon.tga",
 ]
 
@@ -39,7 +39,9 @@ for expected in (
 core = (ROOT / "Core.lua").read_text(encoding="utf-8")
 for snippet in (
     # Context detection and existing switching behavior.
+    "C_DelvesUI.HasActiveDelve",
     "C_PartyInfo.IsDelveInProgress",
+    "C_PartyInfo.IsDelveComplete",
     "C_ChallengeMode.IsChallengeModeActive",
     "C_ChallengeMode.HasSlottedKeystone",
     "C_ClassTalents.SwitchToLoadoutByIndex",
@@ -138,6 +140,16 @@ for snippet in (
     if snippet not in core:
         errors.append(f"Expected implementation marker missing: {snippet}")
 
+
+smoke = (ROOT / "tests/smoke.lua").read_text(encoding="utf-8")
+for snippet in (
+    "completed Delve was misdetected as World during reward phase",
+    "completed Delve queued/retried an incorrect World specialization switch",
+    "stale Delve completion flag leaked into World context",
+):
+    if snippet not in smoke:
+        errors.append(f"Delve regression marker missing from smoke test: {snippet}")
+
 localization = (ROOT / "Localization.lua").read_text(encoding="utf-8")
 for snippet in (
     "SLOGAN_V2",
@@ -168,7 +180,7 @@ for forbidden in (
     if forbidden in core:
         errors.append(f"Combat automation API must not be used: {forbidden}")
 
-for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v2.0.0.md"):
+for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v2.0.1.md"):
     path = ROOT / rel
     if path.is_file() and "buymeacoffee.com/bertuzzi" not in path.read_text(encoding="utf-8"):
         errors.append(f"Support link missing from {rel}")
@@ -181,4 +193,4 @@ if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)
 
-print("Static validation passed for Loadout Pilot 2.0.0.")
+print("Static validation passed for Loadout Pilot 2.0.1.")

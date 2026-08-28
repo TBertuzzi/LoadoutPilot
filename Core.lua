@@ -688,14 +688,39 @@ function addon:GetConfiguredSpecID(context)
 end
 
 function addon:DetectContext()
-    if C_PartyInfo and C_PartyInfo.IsDelveInProgress then
-        local inDelve = SafeBooleanCall(C_PartyInfo.IsDelveInProgress)
-        if inDelve == true then
+    local inInstance, instanceType = IsInInstance()
+
+    -- Midnight 12.x exposes HasActiveDelve as the primary current-location
+    -- signal used by Blizzard UI. Keep the Delve context for the full visit,
+    -- including the post-completion reward/chest phase.
+    if C_DelvesUI and C_DelvesUI.HasActiveDelve then
+        local hasActiveDelve = SafeBooleanCall(C_DelvesUI.HasActiveDelve)
+        if hasActiveDelve == true then
             return "delve"
         end
     end
 
-    local inInstance, instanceType = IsInInstance()
+    -- Compatibility/fallback path. IsDelveInProgress becomes false as soon as
+    -- the Delve is completed, while the player can still be inside collecting
+    -- rewards. IsDelveComplete covers that state, but only trust it while the
+    -- player is physically inside a scenario so a stale completion flag can
+    -- never pin the context to Delve after returning to the world.
+    if C_PartyInfo then
+        if C_PartyInfo.IsDelveInProgress then
+            local inDelve = SafeBooleanCall(C_PartyInfo.IsDelveInProgress)
+            if inDelve == true then
+                return "delve"
+            end
+        end
+
+        if inInstance and instanceType == "scenario" and C_PartyInfo.IsDelveComplete then
+            local delveComplete = SafeBooleanCall(C_PartyInfo.IsDelveComplete)
+            if delveComplete == true then
+                return "delve"
+            end
+        end
+    end
+
     if inInstance then
         if instanceType == "arena" or instanceType == "pvp" then
             return "pvp"

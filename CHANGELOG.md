@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 - 2026-08-28
+- Fixed Delve context detection after completion: Loadout Pilot now remains in **Delve** while the player is still inside collecting reward chests instead of prematurely restoring the World loadout.
+- Uses Midnight 12.x `C_DelvesUI.HasActiveDelve()` as the primary Delve-location signal.
+- Adds a guarded `C_PartyInfo.IsDelveComplete()` fallback for the completed reward phase while physically inside a scenario.
+- Prevents the specialization retry loop from repeatedly attempting the World specialization whenever the player stops moving after finishing a Delve.
+- Added regression coverage for **active Delve -> completed/reward phase -> leave Delve -> World restore**.
+
 ## 2.0.0 - 2026-08-27
 - Polished Raid Bosses rows: boss and raid now use separate lines, with the Loot Spec badge isolated on the right so long localized names stay inside the button.
 - Standardized all **HUD & Interface** action buttons to the same width, using the widest localized control as the baseline for a cleaner aligned column.

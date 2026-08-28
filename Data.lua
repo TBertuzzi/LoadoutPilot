@@ -2,7 +2,7 @@ local ADDON_NAME, LP = ...
 LP.Data = LP.Data or {}
 local Data = LP.Data
 
-Data.version = "2.0.0"
+Data.version = "2.0.1"
 Data.interface = 120100
 Data.schema = 5
 
