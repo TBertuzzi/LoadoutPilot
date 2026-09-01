@@ -690,6 +690,16 @@ end
 function addon:DetectContext()
     local inInstance, instanceType = IsInInstance()
 
+    -- Midnight 12.1 Lairs share the C_DelvesUI API family with Delves. A Lair
+    -- can therefore also expose an active Delve-style signal. Always ask the
+    -- dedicated location API first so World Boss Lairs use the Raid rule.
+    if C_DelvesUI and C_DelvesUI.IsInLair then
+        local inLair = SafeBooleanCall(C_DelvesUI.IsInLair)
+        if inLair == true then
+            return "raid"
+        end
+    end
+
     -- Midnight 12.x exposes HasActiveDelve as the primary current-location
     -- signal used by Blizzard UI. Keep the Delve context for the full visit,
     -- including the post-completion reward/chest phase.

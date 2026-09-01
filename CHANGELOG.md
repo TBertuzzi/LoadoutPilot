@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2 - 2026-09-01
+- Fixed Midnight 12.1 **Lair** context detection.
+- World Boss Lairs such as **The Tidebound Grotto** now use the **Raid** context instead of being misdetected as Delves.
+- `C_DelvesUI.IsInLair()` is checked before `HasActiveDelve()` so the dedicated Lair location signal wins over overlapping Delve API state.
+- Leaving a Lair correctly restores the normal World rule.
+- Added regression coverage for **Lair + active Delve signal -> Raid -> leave -> World restore**.
+- Preserved the 2.0.1 completed-Delve reward-phase fix.
+
 ## 2.0.1 - 2026-08-28
 - Fixed Delve context detection after completion: Loadout Pilot now remains in **Delve** while the player is still inside collecting reward chests instead of prematurely restoring the World loadout.
 - Uses Midnight 12.x `C_DelvesUI.HasActiveDelve()` as the primary Delve-location signal.

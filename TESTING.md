@@ -1,4 +1,4 @@
-# Loadout Pilot 2.0.1 Test Plan
+# Loadout Pilot 2.0.2 Test Plan
 
 ## Automated coverage
 
@@ -11,6 +11,7 @@ The smoke test exercises:
 - Role-safe playing specialization switching, including solo cross-role rules.
 - Combat queue/retry behavior.
 - PvP -> World regression behavior.
+- Lair -> Raid context detection even when the overlapping active-Delve signal is true.
 - Delve active -> completed reward phase -> World exit regression behavior.
 - Raid boss discovery from the Encounter Journal.
 - Stable DungeonEncounterID rules and migration from early NPC-keyed test rules.
@@ -25,7 +26,17 @@ The smoke test exercises:
 - Configuration export/import round trip.
 - Event history and new slash commands.
 
-## Required live-client validation for 2.0.1
+## Required live-client validation for 2.0.2
+
+### Lair context regression (2.0.2)
+
+1. Configure visibly different **Raid**, **Delve**, and **World** specializations/loadouts.
+2. Enter **The Tidebound Grotto Lair**.
+3. Confirm the HUD/context reports **Raid**, not Delve.
+4. Confirm the configured Raid specialization/talents/gear are used whenever WoW permits the change.
+5. Leave the Lair.
+6. Confirm the context changes to **World** and the World rule is restored.
+7. Re-enter a normal Delve and confirm normal Delves still resolve as **Delve**.
 
 ### Delve completion regression (2.0.1)
 

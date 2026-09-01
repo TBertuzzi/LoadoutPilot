@@ -2,7 +2,7 @@
 ## Title: Loadout Pilot
 ## Notes: Set your rules. Play your content. Loadout Pilot handles the rest. Automatic/Notify/Off loadout rules, unified dungeon overrides, raid-boss loot spec overrides, and explainable automation.
 ## Author: Thiago Bertuzzi
-## Version: 2.0.1
+## Version: 2.0.2
 ## SavedVariablesPerCharacter: LoadoutPilotDB
 ## IconTexture: Interface\AddOns\LoadoutPilot\Media\MinimapIcon
 

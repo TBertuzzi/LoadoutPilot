@@ -1,8 +1,8 @@
-# CurseForge Submission - Loadout Pilot 2.0.1
+# CurseForge Submission - Loadout Pilot 2.0.2
 
 ## Display name
 
-Loadout Pilot 2.0.1
+Loadout Pilot 2.0.2
 
 ## Release type
 
@@ -25,7 +25,7 @@ Avoid Plugins unless CurseForge is using that category in a broader sense; Loado
 
 ## Upload file
 
-Use `LoadoutPilot-v2.0.1-CurseForge.zip`. The archive contains exactly one top-level `LoadoutPilot` folder.
+Use `LoadoutPilot-v2.0.2-CurseForge.zip`. The archive contains exactly one top-level `LoadoutPilot` folder.
 
 ## Compatibility
 

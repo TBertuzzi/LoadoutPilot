@@ -56,6 +56,7 @@ local state = {
     inDelve = false,
     delveComplete = false,
     activeDelve = false,
+    inLair = false,
     inInstance = false,
     instanceType = "none",
     instanceName = "Open World",
@@ -285,6 +286,7 @@ C_PartyInfo = {
 }
 C_DelvesUI = {
     HasActiveDelve = function() return state.activeDelve end,
+    IsInLair = function() return state.inLair end,
 }
 C_ChallengeMode = {
     IsChallengeModeActive = function() return state.challenge end,
@@ -440,6 +442,7 @@ local function tick(seconds)
     addon.scripts.OnUpdate(addon, seconds)
 end
 local function setWorld()
+    state.inLair = false
     state.inDelve = false
     state.delveComplete = false
     state.activeDelve = false
@@ -454,6 +457,7 @@ local function setWorld()
     state.uiMapID = nil
 end
 local function setDelve(inProgress, complete, hasActiveDelve)
+    state.inLair = false
     state.inDelve = inProgress == true
     state.delveComplete = complete == true
     state.activeDelve = hasActiveDelve ~= false
@@ -469,7 +473,27 @@ local function setDelve(inProgress, complete, hasActiveDelve)
     state.uiMapID = 22001
 end
 
+local function setLair(name, instanceID)
+    -- Reproduce Midnight 12.1 World Boss Lairs: they are scenario instances
+    -- exposed through C_DelvesUI and can also report an active Delve signal.
+    state.inLair = true
+    state.inDelve = false
+    state.delveComplete = false
+    state.activeDelve = true
+    state.inInstance = true
+    state.instanceType = "scenario"
+    state.instanceName = name or "Tidebound Grotto Lair"
+    state.instanceID = instanceID or 13001
+    state.difficultyID = 0
+    state.challenge = false
+    state.slottedKeystone = false
+    state.activeChallengeMapID = nil
+    state.slottedChallengeMapID = nil
+    state.uiMapID = 23001
+end
+
 local function setDungeon(name, instanceID)
+    state.inLair = false
     state.inDelve = false
     state.delveComplete = false
     state.activeDelve = false
@@ -484,6 +508,7 @@ local function setDungeon(name, instanceID)
     state.uiMapID = nil
 end
 local function setMythicPlus(mapID, active)
+    state.inLair = false
     state.inDelve = false
     state.delveComplete = false
     state.activeDelve = false
@@ -498,6 +523,7 @@ local function setMythicPlus(mapID, active)
     state.uiMapID = challengeDungeonIDs[mapID] and challengeDungeonIDs[mapID].uiMapID or nil
 end
 local function setRaid(name, instanceID)
+    state.inLair = false
     state.inDelve = false
     state.delveComplete = false
     state.activeDelve = false
@@ -615,6 +641,24 @@ state.delveComplete = true
 state.activeDelve = false
 assert(addon:DetectContext() == "world", "stale Delve completion flag leaked into World context")
 state.delveComplete = false
+
+-- 2.0.2 Lair regression: Midnight Lairs share the C_DelvesUI API family
+-- with Delves, and HasActiveDelve may be true inside a Lair. The dedicated
+-- IsInLair signal must win so Tidebound Grotto uses the Raid rule.
+LoadoutPilotDB.specBindings["raid"] = {specID=62, name="Arcane"}
+LoadoutPilotDB.talentBindings["62:raid"] = {configID=301, name="Arcane Default"}
+setLair("Tidebound Grotto Lair", 13001)
+tick(0.6)
+assert(state.activeDelve == true, "Lair regression fixture must expose the overlapping Delve signal")
+assert(addon:DetectContext() == "raid", "Lair was misdetected as Delve")
+assert(addon:IsInsideRaidInstance() == true, "Lair did not participate in Raid-context instance handling")
+assert(state.specID == 62, "Lair did not apply the configured Raid specialization")
+
+-- Leaving the Lair must still restore the normal World rule.
+setWorld()
+tick(0.6)
+assert(addon:DetectContext() == "world", "leaving a Lair did not restore World context")
+assert(state.specID == 64, "World specialization was not restored after leaving the Lair")
 
 -- General Mythic+ defaults: Frost + default M+ talent + PvE gear.
 LoadoutPilotDB.talentBindings["64:mythicplus"] = {configID=203, name="Frost M+ Default"}
@@ -1118,4 +1162,4 @@ assert(applyRows == 0, "routine ApplyCurrentRules reevaluations leaked into even
 assert(debugRows == 0, "debug rows were recorded while chat debug was disabled")
 assert(#LoadoutPilotDB.eventLog <= 3, "routine role-assigned reevaluations produced noisy event history")
 
-print("Smoke test passed: Loadout Pilot 2.0.1 regression coverage including completed-Delve reward-phase retention plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")
+print("Smoke test passed: Loadout Pilot 2.0.2 regression coverage including Lair-to-Raid detection, completed-Delve reward-phase retention plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")
