@@ -94,3 +94,8 @@ Source code is available on GitHub under **TBertuzzi/LoadoutPilot**.
 If Loadout Pilot is useful to you and you would like to support continued development:
 
 https://buymeacoffee.com/bertuzzi
+
+## 2.1 interface refresh
+
+Version 2.1 refreshes the main navigation with native WoW icons and adds Configuration Health to help identify missing saved talent loadouts or equipment sets. Loadout Pilot continues to use Blizzard-native saved talent loadouts only.
+

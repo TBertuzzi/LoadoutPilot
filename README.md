@@ -1220,3 +1220,8 @@ Developed and maintained by **Thiago Bertuzzi**.
 # License
 
 **MIT**
+
+## 2.1 UI refresh
+
+Loadout Pilot 2.1 refreshes the configuration interface with native WoW icons and adds Configuration Health for detecting missing saved Blizzard talent loadouts and equipment sets. The addon continues to use Blizzard-native talent loadouts.
+

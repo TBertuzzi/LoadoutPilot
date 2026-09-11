@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: Loadout Pilot
-## Notes: Set your rules. Play your content. Loadout Pilot handles the rest. Automatic/Notify/Off loadout rules, unified dungeon overrides, raid-boss loot spec overrides, and explainable automation.
+## Notes: Set your rules. Play your content. Loadout Pilot handles the rest. Refreshed navigation, configuration health, context-aware spec, talents, gear and loot rules.
 ## Author: Thiago Bertuzzi
-## Version: 2.0.2
+## Version: 2.1.0
 ## SavedVariablesPerCharacter: LoadoutPilotDB
 ## IconTexture: Interface\AddOns\LoadoutPilot\Media\MinimapIcon
 

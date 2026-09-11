@@ -3284,6 +3284,104 @@ function addon:UpdateNotification()
     end
 end
 
+local NAV_ICON_TEXTURES = {
+    general = "Interface\\Icons\\INV_Misc_Gear_01",
+    contexts = "Interface\\Icons\\INV_Misc_Map_01",
+    dungeons = "Interface\\Icons\\INV_Misc_Key_03",
+    raids = "Interface\\Icons\\Achievement_Boss_LichKing",
+    automation = "Interface\\Icons\\Spell_Nature_Lightning",
+    health = "Interface\\Icons\\INV_Misc_Bandage_12",
+    hud = "Interface\\Icons\\INV_Misc_Eye_01",
+    advanced = "Interface\\Icons\\Trade_Engineering",
+}
+
+local CONTEXT_ICON_TEXTURES = {
+    world = "Interface\\Icons\\INV_Misc_Map_01",
+    delve = "Interface\\Icons\\Trade_Mining",
+    dungeon = "Interface\\Icons\\INV_Misc_Key_03",
+    mythicplus = "Interface\\Icons\\Achievement_ChallengeMode_Gold",
+    raid = "Interface\\Icons\\Achievement_Boss_LichKing",
+    pvp = "Interface\\Icons\\INV_Shield_05",
+}
+
+local function DecorateIconButton(button, texturePath, iconSize, leftPadding)
+    if not button or not texturePath then return end
+    iconSize = iconSize or 18
+    leftPadding = leftPadding or 8
+    button.icon = button.icon or button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetSize(iconSize, iconSize)
+    button.icon:ClearAllPoints()
+    button.icon:SetPoint("LEFT", button, "LEFT", leftPadding, 0)
+    button.icon:SetTexture(texturePath)
+    button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if button.text then
+        button.text:ClearAllPoints()
+        button.text:SetPoint("LEFT", button.icon, "RIGHT", 6, 0)
+        button.text:SetPoint("RIGHT", button, "RIGHT", -5, 0)
+        button.text:SetJustifyH("LEFT")
+    end
+end
+
+function addon:GetConfigurationHealthLines()
+    local lines = {}
+    local issueCount = 0
+    local currentSpecID = select(1, self:GetSpecInfo())
+
+    for _, context in ipairs(Data.contextOrder) do
+        local specBinding = self:ResolveSpecBinding(context)
+        local specID = specBinding and specBinding.specID or currentSpecID
+        local issues = {}
+
+        local talent = specID and self:ResolveTalentBinding(specID, context) or nil
+        if talent and (not talent.configID or not self:GetTalentName(talent.configID)) then
+            table.insert(issues, T("HEALTH_TALENT_MISSING"))
+        end
+
+        local gear, gearInfo = nil, nil
+        if specID then gear, gearInfo = self:ResolveEquipmentBinding(specID, context) end
+        if gear and not gearInfo then
+            table.insert(issues, T("HEALTH_GEAR_MISSING"))
+        end
+
+        issueCount = issueCount + #issues
+        local stateText
+        if #issues == 0 then
+            stateText = "|cff66ff99" .. T("HEALTH_READY") .. "|r"
+        else
+            stateText = "|cffff7777" .. table.concat(issues, ", ") .. "|r"
+        end
+        table.insert(lines, tostring(ContextName(context)) .. ": " .. stateText)
+    end
+
+    local dungeonIssues = 0
+    for _, override in pairs(DB.dungeonOverrides or {}) do
+        if type(override) == "table" then
+            if override.talent then
+                local sid = tonumber(override.talent.specID) or currentSpecID
+                local resolved = sid and self:ResolveTalentRecord(sid, override.talent) or nil
+                if resolved and (not resolved.configID or not self:GetTalentName(resolved.configID)) then
+                    dungeonIssues = dungeonIssues + 1
+                end
+            end
+            if override.equipment then
+                local _, info = self:ResolveEquipmentRecord(override.equipment)
+                if not info then dungeonIssues = dungeonIssues + 1 end
+            end
+        end
+    end
+
+    if dungeonIssues > 0 then
+        issueCount = issueCount + dungeonIssues
+        table.insert(lines, "|cffff7777" .. T("HEALTH_DUNGEON_ISSUES", dungeonIssues) .. "|r")
+    end
+
+    if issueCount == 0 then
+        table.insert(lines, "")
+        table.insert(lines, "|cff66ff99" .. T("HEALTH_ALL_GOOD") .. "|r")
+    end
+    return lines
+end
+
 local function CreateMainFrame()
     local frame = CreateFrame("Frame", "LoadoutPilotMainFrame", UIParent, "BackdropTemplate")
     frame:SetSize(820, 610)
@@ -3320,16 +3418,17 @@ local function CreateMainFrame()
     frame.version:SetText(T("VERSION", Data.version))
 
     -- Sidebar navigation.
-    local navKeys = { "general", "contexts", "dungeons", "raids", "automation", "hud", "advanced" }
+    local navKeys = { "general", "contexts", "dungeons", "raids", "automation", "health", "hud", "advanced" }
     local navLabels = {
         general="PAGE_GENERAL", contexts="PAGE_CONTEXTS", dungeons="PAGE_DUNGEONS",
-        raids="PAGE_RAID_BOSSES", automation="PAGE_AUTOMATION", hud="PAGE_HUD", advanced="PAGE_ADVANCED",
+        raids="PAGE_RAID_BOSSES", automation="PAGE_AUTOMATION", health="PAGE_HEALTH", hud="PAGE_HUD", advanced="PAGE_ADVANCED",
     }
     local navY = -72
     for _, key in ipairs(navKeys) do
         local button = CreateButton(frame, T(navLabels[key]), 138, 32)
         button:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, navY)
         button.pageKey = key
+        DecorateIconButton(button, NAV_ICON_TEXTURES[key], 18, 8)
         button:SetScript("OnClick", function(self) addon:SetMainPage(self.pageKey) end)
         pageButtons[key] = button
         navY = navY - 38
@@ -3391,6 +3490,7 @@ local function CreateMainFrame()
         local button = CreateButton(contexts, ContextName(context), 96, 27)
         button:SetPoint("TOPLEFT", contexts, "TOPLEFT", x, -98)
         button.context = context
+        DecorateIconButton(button, CONTEXT_ICON_TEXTURES[context], 16, 6)
         button:SetScript("OnClick", function(self) DB.selectedContext=self.context; HidePickers(); addon:UpdateAll() end)
         contextButtons[context] = button
         x = x + 101
@@ -3416,13 +3516,13 @@ local function CreateMainFrame()
     -- Dungeon page.
     local dungeons = CreatePage("dungeons","PAGE_DUNGEONS","PAGE_DUNGEONS_DESC")
     dungeons.current = dungeons:CreateFontString(nil,"OVERLAY","GameFontHighlight"); dungeons.current:SetPoint("TOPLEFT",0,-95); dungeons.current:SetWidth(600); dungeons.current:SetJustifyH("LEFT")
-    frame.dungeonOverrides = CreateButton(dungeons,T("OPEN_DUNGEON_OVERRIDES"),260,32); frame.dungeonOverrides:SetPoint("TOPLEFT",0,-145); frame.dungeonOverrides:SetScript("OnClick",function() addon:ToggleDungeonOverrides() end)
+    frame.dungeonOverrides = CreateButton(dungeons,T("OPEN_DUNGEON_OVERRIDES"),260,32); frame.dungeonOverrides:SetPoint("TOPLEFT",0,-145); DecorateIconButton(frame.dungeonOverrides, NAV_ICON_TEXTURES.dungeons, 18, 8); frame.dungeonOverrides:SetScript("OnClick",function() addon:ToggleDungeonOverrides() end)
     dungeons.explain = dungeons:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); dungeons.explain:SetPoint("TOPLEFT",0,-205); dungeons.explain:SetWidth(600); dungeons.explain:SetJustifyH("LEFT"); dungeons.explain:SetText(T("DUNGEON_PAGE_HELP"))
 
     -- Raid boss page.
     local raids = CreatePage("raids","PAGE_RAID_BOSSES","PAGE_RAID_BOSSES_DESC")
     raids.current = raids:CreateFontString(nil,"OVERLAY","GameFontHighlight"); raids.current:SetPoint("TOPLEFT",0,-95); raids.current:SetWidth(600); raids.current:SetJustifyH("LEFT")
-    frame.raidBossOverrides = CreateButton(raids,T("OPEN_RAID_BOSS_OVERRIDES"),280,32); frame.raidBossOverrides:SetPoint("TOPLEFT",0,-145); frame.raidBossOverrides:SetScript("OnClick",function() addon:ToggleRaidBossOverrides() end)
+    frame.raidBossOverrides = CreateButton(raids,T("OPEN_RAID_BOSS_OVERRIDES"),280,32); frame.raidBossOverrides:SetPoint("TOPLEFT",0,-145); DecorateIconButton(frame.raidBossOverrides, NAV_ICON_TEXTURES.raids, 18, 8); frame.raidBossOverrides:SetScript("OnClick",function() addon:ToggleRaidBossOverrides() end)
     raids.explain = raids:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); raids.explain:SetPoint("TOPLEFT",0,-205); raids.explain:SetWidth(600); raids.explain:SetJustifyH("LEFT"); raids.explain:SetText(T("RAID_BOSS_PAGE_HELP"))
 
     -- Automation modes page.
@@ -3442,6 +3542,22 @@ local function CreateMainFrame()
     end
     automation.legend=automation:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); automation.legend:SetPoint("BOTTOMLEFT",0,22); automation.legend:SetWidth(600); automation.legend:SetJustifyH("LEFT"); automation.legend:SetText(T("AUTOMATION_MODE_LEGEND"))
     frame.autoSpec=frame.automationButtons.spec; frame.autoTalents=frame.automationButtons.talents; frame.autoGear=frame.automationButtons.gear; frame.autoLootSpec=frame.automationButtons.lootSpec
+
+    -- Configuration health page.
+    local health = CreatePage("health", "PAGE_HEALTH", "PAGE_HEALTH_DESC")
+    health.overview = health:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    health.overview:SetPoint("TOPLEFT", 0, -90)
+    health.overview:SetText(T("HEALTH_OVERVIEW"))
+    frame.healthText = health:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    frame.healthText:SetPoint("TOPLEFT", 0, -122)
+    frame.healthText:SetWidth(600)
+    frame.healthText:SetJustifyH("LEFT")
+    frame.healthText:SetJustifyV("TOP")
+    health.hint = health:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    health.hint:SetPoint("BOTTOMLEFT", 0, 22)
+    health.hint:SetWidth(600)
+    health.hint:SetJustifyH("LEFT")
+    health.hint:SetText(T("HEALTH_REFRESH_HINT"))
 
     -- HUD / interface page.
     local hud = CreatePage("hud","PAGE_HUD","PAGE_HUD_DESC")
@@ -5147,6 +5263,8 @@ function addon:UpdateMainFrame()
     mainFrame.debugToggle.text:SetText(DB.debug and T("DEBUG_BUTTON_ON") or T("DEBUG_BUTTON_OFF"))
     mainFrame.eventPreview:SetText(T("EVENT_LOG_PREVIEW", self:GetRecentEventLogText(6)))
 
+    if mainFrame.healthText then mainFrame.healthText:SetText(table.concat(self:GetConfigurationHealthLines(), "\n")) end
+
     local page = mainFrame.pages[DB.selectedPage] and DB.selectedPage or "general"
     DB.selectedPage = page
     for key, child in pairs(mainFrame.pages) do child:SetShown(key == page) end
@@ -5330,7 +5448,7 @@ function addon:InitializeDatabase()
     DB.languageOverride = NormalizeAddonLanguage(DB.languageOverride)
     if LP.SetLocaleOverride then LP.SetLocaleOverride(DB.languageOverride) end
     if not Data.contextLabelKeys[DB.selectedContext] then DB.selectedContext = "world" end
-    local validPages = {general=true,contexts=true,dungeons=true,raids=true,automation=true,hud=true,advanced=true}
+    local validPages = {general=true,contexts=true,dungeons=true,raids=true,automation=true,health=true,hud=true,advanced=true}
     if not validPages[DB.selectedPage] then DB.selectedPage = "general" end
     AppendEventLog("init", "Loadout Pilot " .. tostring(Data.version) .. " schema=" .. tostring(Data.schema))
 end

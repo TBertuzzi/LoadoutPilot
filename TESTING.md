@@ -205,3 +205,13 @@ Recheck:
 7. Verify only Loot Spec changes; spec, talents, and gear remain controlled by the normal Raid rule.
 8. For a raid map where UiMapID resolution is unavailable, verify the InstanceID/Encounter Journal tier fallback still loads the boss list.
 
+
+## 2.1.0 UI regression
+
+- Open every main page and confirm sidebar icons are aligned and text is not clipped.
+- Select every content context and confirm each selector icon/text stays inside its button.
+- Open Configuration Health with a valid setup and confirm contexts show Ready.
+- Temporarily rename/delete a saved talent loadout or equipment set and confirm Health reports the broken reference.
+- Verify World, Delve, Dungeon/Mythic+, Raid/Lair, and PvP context switching still behaves like 2.0.2.
+- Confirm completed Delves remain Delve until the player leaves.
+- Confirm Lairs use Raid and restore World after leaving.

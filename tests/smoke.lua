@@ -1162,4 +1162,10 @@ assert(applyRows == 0, "routine ApplyCurrentRules reevaluations leaked into even
 assert(debugRows == 0, "debug rows were recorded while chat debug was disabled")
 assert(#LoadoutPilotDB.eventLog <= 3, "routine role-assigned reevaluations produced noisy event history")
 
-print("Smoke test passed: Loadout Pilot 2.0.2 regression coverage including Lair-to-Raid detection, completed-Delve reward-phase retention plus unified dungeon overrides, Encounter Journal raid-boss discovery and ENCOUNTER_START Loot Spec rules, AUTO/NOTIFY/OFF, role safety including solo cross-role switching, explainable rule sources, import/export, raid-first boss filtering/search/persistence, raid-boss catalog cleanup/pagination, compact event history, combat queues, loot restoration, and PvP exit recovery.")
+-- 2.1 UI/UX refresh: Configuration Health must be available without changing
+-- any automation behavior or requiring a new SavedVariables schema.
+assert(_G.LoadoutPilotMainFrame and _G.LoadoutPilotMainFrame.pages and _G.LoadoutPilotMainFrame.pages.health, "Configuration Health page was not created")
+local healthLines = addon:GetConfigurationHealthLines()
+assert(type(healthLines) == "table" and #healthLines >= 6, "Configuration Health did not report the general contexts")
+
+print("Smoke test passed: Loadout Pilot 2.1.0 UI/health checks plus 2.0.2 regression coverage including Lair-to-Raid detection, completed-Delve reward-phase retention, unified dungeon overrides, raid boss Loot Spec rules, AUTO/NOTIFY/OFF, role safety, import/export, combat queues, loot restoration, and PvP exit recovery.")

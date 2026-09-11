@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0 - 2026-09-11
+
+- Refreshed main navigation with native WoW icons.
+- Added context icons for World, Delve, Dungeon, Mythic+, Raid, and PvP.
+- Added Configuration Health to detect broken talent/equipment references.
+- Kept Blizzard-native talent loadouts as the only talent source.
+- Preserved 2.0.1 Delve and 2.0.2 Lair context fixes.
+
 ## 2.0.2 - 2026-09-01
 - Fixed Midnight 12.1 **Lair** context detection.
 - World Boss Lairs such as **The Tidebound Grotto** now use the **Raid** context instead of being misdetected as Delves.
