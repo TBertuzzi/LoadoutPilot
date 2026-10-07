@@ -59,6 +59,7 @@ local activeLootSpecOverrideKey
 local lootSpecRestoreID
 local lastLoggedRuleSignature
 local lastLoggedNotifyKey
+local lastDecision
 
 local HUD_LAYOUT = {
     paddingLeft = 8,
@@ -2174,6 +2175,7 @@ function addon:LogResolvedRuleEvent(rule)
     end
 
     local source = rule.raidBossOverride and "raid-boss" or (rule.override and "dungeon-override" or "context")
+    lastDecision = location .. " / " .. source
     local specName = self:GetSpecNameByID(rule.configuredSpecID) or "-"
     local lootName = rule.lootSpecID ~= nil and self:GetLootSpecDisplayName(rule.lootSpecID) or "-"
     local talentName = rule.talentBinding and (self:GetTalentName(rule.talentBinding.configID) or rule.talentBinding.name) or "-"
@@ -2216,6 +2218,35 @@ end
 function addon:PrintExplain()
     Print(T("EXPLAIN_TITLE"), true)
     for _, line in ipairs(self:GetRuleExplanationLines()) do Print(line, true) end
+end
+
+function addon:GetWhyLines()
+    local rule = self:ResolveRuntimeRule(false)
+    if not rule then return { T("EXPLAIN_NO_RULE") } end
+    local lines = { T("WHY_CONTEXT", self:GetContextDetailLabel(rule)) }
+    local fields = {
+        { "spec", T("SPECIALIZATION"), rule.configuredSpecID ~= rule.currentSpecID, pendingSpecID, lastSpecError },
+        { "lootSpec", T("LOOT_SPECIALIZATION"), rule.lootSpecID ~= nil and rule.lootSpecID ~= self:GetLootSpecializationID(), pendingLootSpecID, lastLootSpecError },
+        { "talents", T("TALENTS"), rule.talentBinding and rule.talentBinding.configID ~= self:GetSelectedTalentConfigID(rule.runtimeSpecID), pendingTalentKey, lastTalentError },
+        { "gear", T("GEAR"), rule.gearBinding and not (rule.gearInfo and rule.gearInfo.isEquipped), pendingGearKey, lastGearError },
+    }
+    for _, field in ipairs(fields) do
+        local mode = self:GetAutomationMode(field[1])
+        local reason
+        if not field[3] then reason = T("WHY_NO_CHANGE")
+        elseif mode ~= "auto" then reason = T("WHY_MODE", string.upper(mode))
+        elseif field[1] == "spec" and rule.roleState and rule.roleState.mismatch then reason = T("WHY_ROLE")
+        elseif field[4] then reason = InCombatLockdown and InCombatLockdown() and T("WHY_COMBAT") or T("WHY_PENDING")
+        elseif field[5] then reason = tostring(field[5])
+        else reason = T("WHY_CURRENT") end
+        table.insert(lines, T("WHY_FIELD", field[2], reason))
+    end
+    if lastDecision then table.insert(lines, T("WHY_LAST", lastDecision)) end
+    return lines
+end
+
+function addon:PrintWhy()
+    for _, line in ipairs(self:GetWhyLines()) do Print(line, true) end
 end
 
 function addon:GetRecentEventLogText(limit)
@@ -2303,13 +2334,14 @@ function addon:ExportConfiguration()
     return table.concat(lines, "\n")
 end
 
-function addon:ImportConfiguration(text)
+function addon:ParseConfiguration(text)
     text = tostring(text or "")
+    if #text > 250000 then return false, T("IMPORT_INVALID") end
     local lines = {}
     for line in text:gmatch("[^\r\n]+") do table.insert(lines, line) end
     if #lines == 0 then return false, T("IMPORT_INVALID") end
     local header = SplitString(lines[1], "|")
-    if header[1] ~= "LP2" or header[2] ~= "1" then return false, T("IMPORT_INVALID") end
+    if header[1] ~= "LP2" or header[2] ~= "1" or #header ~= 4 or #lines < 2 then return false, T("IMPORT_INVALID") end
     local _, classFile, classID = UnitClass and UnitClass("player") or nil, nil, nil
     if UnitClass then _, classFile, classID = UnitClass("player") end
     local importedClassID = tonumber(header[3]) or 0
@@ -2354,24 +2386,104 @@ function addon:ImportConfiguration(text)
                 raidInstanceID = row.raidInstanceID, journalInstanceID = row.journalInstanceID,
                 name = row.name, raidName = row.raidName, verified = true
             }
+        else
+            return false, T("IMPORT_INVALID")
         end
     end
 
-    DB.specBindings = newSpec
-    DB.talentBindings = newTalents
-    DB.equipmentBindings = newGear
-    DB.dungeonOverrides = newDungeons
-    DB.raidBossOverrides = newBosses
-    for key, value in pairs(knownDungeons) do DB.knownDungeons[key] = value end
-    for key, value in pairs(knownBosses) do DB.knownRaidBosses[key] = value end
-    for kind, mode in pairs(modes) do self:SetAutomationMode(kind, mode, true, true) end
+    return true, {
+        specBindings = newSpec, talentBindings = newTalents, equipmentBindings = newGear,
+        dungeonOverrides = newDungeons, raidBossOverrides = newBosses,
+        knownDungeons = knownDungeons, knownRaidBosses = knownBosses, automationModes = modes,
+    }
+end
+
+local CONFIG_FIELDS = { "specBindings", "talentBindings", "equipmentBindings", "dungeonOverrides", "raidBossOverrides", "automationModes" }
+
+local function CopyConfig(value)
+    if type(value) ~= "table" then return value end
+    local copy = {}
+    for key, child in pairs(value) do copy[key] = CopyConfig(child) end
+    return copy
+end
+
+local function ConfigEqual(a, b)
+    if type(a) ~= type(b) then return false end
+    if type(a) ~= "table" then return a == b end
+    for key, value in pairs(a) do if not ConfigEqual(value, b[key]) then return false end end
+    -- Saved runtime metadata (for example a spec's index) is not in LP2.
+    -- Compare only fields the import format can actually replace.
+    return true
+end
+
+function addon:PreviewConfiguration(text)
+    local ok, incoming = self:ParseConfiguration(text)
+    if not ok then return false, incoming end
+    local lines = { T("PREVIEW_TITLE") }
+    local labels = { specBindings=T("SPECIALIZATION"), talentBindings=T("TALENTS"),
+        equipmentBindings=T("GEAR"), dungeonOverrides=T("PAGE_DUNGEONS"),
+        raidBossOverrides=T("PAGE_RAID_BOSSES"), automationModes=T("PAGE_AUTOMATION") }
+    local changes = 0
+    for _, field in ipairs(CONFIG_FIELDS) do
+        local added, changed, removed = 0, 0, 0
+        for key, value in pairs(incoming[field]) do
+            if DB[field] == nil or DB[field][key] == nil then added = added + 1
+            elseif not ConfigEqual(value, DB[field][key]) then changed = changed + 1 end
+        end
+        for key in pairs(DB[field] or {}) do
+            if incoming[field][key] == nil then removed = removed + 1 end
+        end
+        changes = changes + added + changed + removed
+        table.insert(lines, T("PREVIEW_FIELD", labels[field], added, changed, removed))
+    end
+    table.insert(lines, changes == 0 and T("PREVIEW_UNCHANGED") or T("PREVIEW_WARNING"))
+    return true, table.concat(lines, "\n")
+end
+
+function addon:BackupConfiguration()
+    local snapshot = {}
+    for _, field in ipairs(CONFIG_FIELDS) do snapshot[field] = CopyConfig(DB[field] or {}) end
+    snapshot.knownDungeons = CopyConfig(DB.knownDungeons or {})
+    snapshot.knownRaidBosses = CopyConfig(DB.knownRaidBosses or {})
+    DB.configBackup = snapshot
+    AppendEventLog("backup", "Configuration snapshot saved")
+    return true
+end
+
+function addon:RestoreConfiguration()
+    if type(DB.configBackup) ~= "table" then return false, T("BACKUP_EMPTY") end
+    local snapshot = DB.configBackup
+    for _, field in ipairs(CONFIG_FIELDS) do DB[field] = CopyConfig(snapshot[field] or {}) end
+    DB.knownDungeons = CopyConfig(snapshot.knownDungeons or {})
+    DB.knownRaidBosses = CopyConfig(snapshot.knownRaidBosses or {})
+    for kind, mode in pairs(DB.automationModes) do self:SetAutomationMode(kind, mode, true, true) end
     activeRaidBossKey = nil
     dismissedNotifyKey = nil
     self:ClearPendingSpecSwitch()
     self:ClearPendingTalentSwitch()
     self:ClearPendingLootSpecChange()
     pendingGearKey = nil
-    AppendEventLog("import", "Configuration imported")
+    AppendEventLog("restore", "Configuration snapshot restored")
+    self:UpdateAll()
+    self:ApplyCurrentRules("restore", false)
+    return true, T("BACKUP_RESTORED")
+end
+
+function addon:ImportConfiguration(text)
+    local ok, incoming = self:ParseConfiguration(text)
+    if not ok then return false, incoming end
+    self:BackupConfiguration()
+    for _, field in ipairs(CONFIG_FIELDS) do DB[field] = incoming[field] end
+    for key, value in pairs(incoming.knownDungeons) do DB.knownDungeons[key] = value end
+    for key, value in pairs(incoming.knownRaidBosses) do DB.knownRaidBosses[key] = value end
+    for kind, mode in pairs(incoming.automationModes) do self:SetAutomationMode(kind, mode, true, true) end
+    activeRaidBossKey = nil
+    dismissedNotifyKey = nil
+    self:ClearPendingSpecSwitch()
+    self:ClearPendingTalentSwitch()
+    self:ClearPendingLootSpecChange()
+    pendingGearKey = nil
+    AppendEventLog("import", "Configuration imported after backup")
     self:UpdateAll()
     self:ApplyCurrentRules("import", false)
     return true, T("IMPORT_SUCCESS")
@@ -3348,24 +3460,28 @@ function addon:GetConfigurationHealthLines()
         if #issues == 0 then
             stateText = "|cff66ff99" .. T("HEALTH_READY") .. "|r"
         else
-            stateText = "|cffff7777" .. table.concat(issues, ", ") .. "|r"
+            stateText = "|cffff7777" .. table.concat(issues, ", ") .. "|r " .. T("HEALTH_FIX_CONTEXT", ContextName(context))
         end
         table.insert(lines, tostring(ContextName(context)) .. ": " .. stateText)
     end
 
     local dungeonIssues = 0
-    for _, override in pairs(DB.dungeonOverrides or {}) do
+    for key, override in pairs(DB.dungeonOverrides or {}) do
         if type(override) == "table" then
             if override.talent then
                 local sid = tonumber(override.talent.specID) or currentSpecID
                 local resolved = sid and self:ResolveTalentRecord(sid, override.talent) or nil
-                if resolved and (not resolved.configID or not self:GetTalentName(resolved.configID)) then
+                if not resolved or not resolved.configID or not self:GetTalentName(resolved.configID) then
                     dungeonIssues = dungeonIssues + 1
+                    table.insert(lines, T("HEALTH_FIX_DUNGEON", tostring(override.name or key), T("TALENTS")))
                 end
             end
             if override.equipment then
                 local _, info = self:ResolveEquipmentRecord(override.equipment)
-                if not info then dungeonIssues = dungeonIssues + 1 end
+                if not info then
+                    dungeonIssues = dungeonIssues + 1
+                    table.insert(lines, T("HEALTH_FIX_DUNGEON", tostring(override.name or key), T("GEAR")))
+                end
             end
         end
     end
@@ -3373,6 +3489,14 @@ function addon:GetConfigurationHealthLines()
     if dungeonIssues > 0 then
         issueCount = issueCount + dungeonIssues
         table.insert(lines, "|cffff7777" .. T("HEALTH_DUNGEON_ISSUES", dungeonIssues) .. "|r")
+    end
+
+    for key, override in pairs(DB.raidBossOverrides or {}) do
+        if type(override) == "table" and override.lootSpecID and override.lootSpecID ~= 0
+            and not self:GetSpecNameByID(override.lootSpecID) then
+            issueCount = issueCount + 1
+            table.insert(lines, T("HEALTH_FIX_BOSS", tostring(override.name or key)))
+        end
     end
 
     if issueCount == 0 then
@@ -3476,7 +3600,8 @@ local function CreateMainFrame()
     frame.apply:SetScript("OnClick", function() addon:ApplyCurrentRules("manual", true) end)
     general.explain = CreateButton(general, T("EXPLAIN_RULE"), 170, 30)
     general.explain:SetPoint("LEFT", frame.apply, "RIGHT", 8, 0)
-    general.explain:SetScript("OnClick", function() addon:PrintExplain() end)
+    general.explain:SetScript("OnClick", function() addon:PrintExplain(); addon:PrintWhy() end)
+    general.explain.text:SetText(T("WHY_BUTTON"))
     general.log = CreateButton(general, T("VIEW_EVENT_LOG"), 170, 30)
     general.log:SetPoint("LEFT", general.explain, "RIGHT", 8, 0)
     general.log:SetScript("OnClick", function() addon:ShowTransferFrame("log") end)
@@ -3558,6 +3683,12 @@ local function CreateMainFrame()
     health.hint:SetWidth(600)
     health.hint:SetJustifyH("LEFT")
     health.hint:SetText(T("HEALTH_REFRESH_HINT"))
+    health.contexts = CreateButton(health, T("PAGE_CONTEXTS"), 180, 28)
+    health.contexts:SetPoint("BOTTOMLEFT", 0, 8)
+    health.contexts:SetScript("OnClick", function() addon:SetMainPage("contexts") end)
+    health.dungeons = CreateButton(health, T("PAGE_DUNGEONS"), 180, 28)
+    health.dungeons:SetPoint("LEFT", health.contexts, "RIGHT", 8, 0)
+    health.dungeons:SetScript("OnClick", function() addon:ToggleDungeonOverrides() end)
 
     -- HUD / interface page.
     local hud = CreatePage("hud","PAGE_HUD","PAGE_HUD_DESC")
@@ -3578,7 +3709,13 @@ local function CreateMainFrame()
     advanced.import=CreateButton(advanced,T("IMPORT_CONFIGURATION"),190,30); advanced.import:SetPoint("LEFT",advanced.export,"RIGHT",8,0); advanced.import:SetScript("OnClick",function() addon:ShowTransferFrame("import") end)
     advanced.log=CreateButton(advanced,T("VIEW_EVENT_LOG"),190,30); advanced.log:SetPoint("TOPLEFT",0,-237); advanced.log:SetScript("OnClick",function() addon:ShowTransferFrame("log") end)
     advanced.clearLog=CreateButton(advanced,T("CLEAR_EVENT_LOG"),190,30); advanced.clearLog:SetPoint("LEFT",advanced.log,"RIGHT",8,0); advanced.clearLog:SetScript("OnClick",function() DB.eventLog={}; lastLoggedRuleSignature=nil; lastLoggedNotifyKey=nil; addon:UpdateAll(); Print(T("EVENT_LOG_CLEARED"),true) end)
-    frame.eventPreview=advanced:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); frame.eventPreview:SetPoint("TOPLEFT",0,-295); frame.eventPreview:SetWidth(600); frame.eventPreview:SetJustifyH("LEFT"); frame.eventPreview:SetJustifyV("TOP")
+    advanced.backup=CreateButton(advanced,T("BACKUP_SAVE"),190,30); advanced.backup:SetPoint("TOPLEFT",0,-279); advanced.backup:SetScript("OnClick",function() addon:BackupConfiguration(); Print(T("BACKUP_SAVED"),true) end)
+    advanced.restore=CreateButton(advanced,T("BACKUP_RESTORE"),190,30); advanced.restore:SetPoint("LEFT",advanced.backup,"RIGHT",8,0); advanced.restore:SetScript("OnClick",function(self)
+        if not self.confirm then self.confirm=true; self.text:SetText(T("BACKUP_CONFIRM")); return end
+        self.confirm=nil; self.text:SetText(T("BACKUP_RESTORE"))
+        local ok, message=addon:RestoreConfiguration(); Print(message,true)
+    end)
+    frame.eventPreview=advanced:CreateFontString(nil,"OVERLAY","GameFontDisableSmall"); frame.eventPreview:SetPoint("TOPLEFT",0,-345); frame.eventPreview:SetWidth(600); frame.eventPreview:SetJustifyH("LEFT"); frame.eventPreview:SetJustifyV("TOP")
 
     talentPicker = CreatePicker("LoadoutPilotTalentPicker", UIParent, 300)
     gearPicker = CreatePicker("LoadoutPilotGearPicker", UIParent, 300)
@@ -3591,6 +3728,11 @@ end
 
 function addon:SetMainPage(page)
     if not mainFrame or not mainFrame.pages then return end
+    local restoreButton = mainFrame.pages.advanced and mainFrame.pages.advanced.restore
+    if restoreButton and page ~= "advanced" then
+        restoreButton.confirm = nil
+        restoreButton.text:SetText(T("BACKUP_RESTORE"))
+    end
     if not mainFrame.pages[page] then page="general" end
     DB.selectedPage=page
     HidePickers()
@@ -4568,7 +4710,7 @@ end
 
 local function CreateTransferFrame()
     local frame = CreateFrame("Frame", "LoadoutPilotTransferFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(700, 470)
+    frame:SetSize(700, 540)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetFrameLevel(1100)
@@ -4589,13 +4731,13 @@ local function CreateTransferFrame()
     -- the rest of the UI.
     frame.scroll = CreateFrame("ScrollFrame", "LoadoutPilotTransferScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.scroll:SetPoint("TOPLEFT", 18, -80)
-    frame.scroll:SetSize(640, 320)
+    frame.scroll:SetSize(640, 300)
     if frame.scroll.SetClipsChildren then frame.scroll:SetClipsChildren(true) end
     if frame.scroll.EnableMouseWheel then frame.scroll:EnableMouseWheel(true) end
 
     frame.edit = CreateFrame("EditBox", "LoadoutPilotTransferEditBox", frame.scroll)
     frame.edit:SetWidth(610)
-    frame.edit:SetHeight(320)
+    frame.edit:SetHeight(300)
     if frame.edit.SetMultiLine then frame.edit:SetMultiLine(true) end
     if frame.edit.SetAutoFocus then frame.edit:SetAutoFocus(false) end
     if frame.edit.SetTextInsets then frame.edit:SetTextInsets(8,8,8,8) end
@@ -4632,6 +4774,9 @@ local function CreateTransferFrame()
 
     frame.edit:SetScript("OnTextChanged", function()
         RefreshTransferEditHeight()
+        frame.previewText = nil
+        if frame.import and frame.import.text then frame.import.text:SetText(T("PREVIEW_BUTTON")) end
+        if frame.preview then frame.preview:SetText("") end
     end)
     frame.edit:SetScript("OnEscapePressed", function(self)
         if self.ClearFocus then self:ClearFocus() end
@@ -4662,10 +4807,26 @@ local function CreateTransferFrame()
     frame.import:SetPoint("LEFT", frame.export, "RIGHT", 8, 0)
     frame.import:SetScript("OnClick", function()
         local text = frame.edit.GetText and frame.edit:GetText() or ""
+        if frame.previewText ~= text or frame.previewBaseline ~= addon:ExportConfiguration() then
+            local valid, summary = addon:PreviewConfiguration(text)
+            if not valid then Print(summary, true); return end
+            frame.previewText = text
+            frame.previewBaseline = addon:ExportConfiguration()
+            frame.preview:SetText(summary)
+            frame.import.text:SetText(T("IMPORT_CONFIRM"))
+            return
+        end
         local ok, message = addon:ImportConfiguration(text)
         Print(message, true)
         if ok then frame:Hide() end
     end)
+    frame.import.text:SetText(T("PREVIEW_BUTTON"))
+
+    frame.preview = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    frame.preview:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -394)
+    frame.preview:SetWidth(650)
+    frame.preview:SetJustifyH("LEFT")
+    frame.preview:SetJustifyV("TOP")
 
     frame.log = CreateButton(frame, T("COPY_EVENT_LOG"), 160, 28)
     frame.log:SetPoint("LEFT", frame.import, "RIGHT", 8, 0)
@@ -4688,6 +4849,10 @@ end
 function addon:ShowTransferFrame(mode)
     if not transferFrame then return end
     transferFrame.mode = mode or "export"
+    transferFrame.previewText = nil
+    transferFrame.previewBaseline = nil
+    transferFrame.preview:SetText("")
+    transferFrame.import.text:SetText(T("PREVIEW_BUTTON"))
     if transferFrame.mode == "import" then
         transferFrame.title:SetText(T("IMPORT_CONFIGURATION"))
         transferFrame.description:SetText(T("IMPORT_DESCRIPTION"))
@@ -5762,6 +5927,7 @@ SlashCmdList.LOADOUTPILOT = function(message)
         addon:PrintStatus()
     elseif command == "explain" or command == "why" then
         addon:PrintExplain()
+        if command == "why" then addon:PrintWhy() end
     elseif command == "overrides" or command == "dungeons" or command == "dungeon" then
         addon:ToggleDungeonOverrides()
     elseif command == "bosses" or command == "boss" or command == "raidbosses" or command == "raid" then
@@ -5795,6 +5961,14 @@ SlashCmdList.LOADOUTPILOT = function(message)
         addon:ShowTransferFrame("export")
     elseif command == "import" then
         addon:ShowTransferFrame("import")
+    elseif command == "backup" then
+        addon:BackupConfiguration()
+        Print(T("BACKUP_SAVED"), true)
+    elseif command == "restore" then
+        local ok, message = addon:RestoreConfiguration()
+        Print(message, true)
+    elseif command == "health" then
+        for _, line in ipairs(addon:GetConfigurationHealthLines()) do Print(line, true) end
     elseif command == "log" or command == "history" then
         if string.lower(rest) == "clear" then
             DB.eventLog = {}
@@ -5840,4 +6014,3 @@ SlashCmdList.LOADOUTPILOT = function(message)
         Print(T("HELP"), true)
     end
 end
-

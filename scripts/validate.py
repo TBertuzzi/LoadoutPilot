@@ -3,14 +3,14 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 INTERFACE = "120100"
 SCHEMA = 5
 REQUIRED = [
     "LoadoutPilot.toc", "Localization.lua", "Data.lua", "Core.lua",
     "README.md", "CHANGELOG.md", "LICENSE", "TESTING.md",
     "CURSEFORGE_DESCRIPTION.md", "CURSEFORGE_SUBMISSION.md", "PUBLISHING.md",
-    "SUPPORT.md", "RELEASE_NOTES_v2.1.0.md",
+    "SUPPORT.md", "RELEASE_NOTES_v2.2.0.md",
     "Media/MinimapIcon.tga",
 ]
 
@@ -125,6 +125,7 @@ for snippet in (
     "CONTEXT_ICON_TEXTURES",
     "DecorateIconButton",
     "GetConfigurationHealthLines",
+    "GetWhyLines", "PreviewConfiguration", "BackupConfiguration", "RestoreConfiguration",
     "PAGE_HEALTH",
     "local hudButtonWidth = 220",
     'command == "explain"',
@@ -167,7 +168,7 @@ for snippet in (
     "AUTOMATION_LOOTSPEC",
     "NOTIFY_TITLE", "NOTIFY_APPLY", "NOTIFY_IGNORE",
     "SOURCE_RAID_BOSS_OVERRIDE",
-    "EXPLAIN_TITLE",
+    "EXPLAIN_TITLE", "PREVIEW_TITLE", "BACKUP_RESTORED",
     "RAID_BOSS_OVERRIDES",
     "RAID_BOSS_TARGET_BEHAVIOR",
     "ALL_RAIDS", "CURRENT_RAID_BUTTON", "SEARCH_BOSS",
@@ -190,7 +191,7 @@ for forbidden in (
     if forbidden in core:
         errors.append(f"Combat automation API must not be used: {forbidden}")
 
-for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v2.1.0.md"):
+for rel in ("README.md", "CURSEFORGE_DESCRIPTION.md", "SUPPORT.md", "RELEASE_NOTES_v2.2.0.md"):
     path = ROOT / rel
     if path.is_file() and "buymeacoffee.com/bertuzzi" not in path.read_text(encoding="utf-8"):
         errors.append(f"Support link missing from {rel}")
@@ -203,4 +204,4 @@ if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)
 
-print("Static validation passed for Loadout Pilot 2.1.0.")
+print("Static validation passed for Loadout Pilot 2.2.0.")

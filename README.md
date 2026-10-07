@@ -1,3 +1,7 @@
+# Loadout Pilot 2.2.0
+
+For the 2.2.0 diagnostics, import preview, backup and restore workflow, see [release notes](RELEASE_NOTES_v2.2.0.md).
+
 # Loadout Pilot
 
 **Set your rules. Play your content. Loadout Pilot handles the rest.**

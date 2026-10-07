@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.0 - 2026-10-07
+
+- Added effective rule and switch diagnostics, with `/lpilot why`.
+- Expanded Configuration Health with direct navigation and named broken references.
+- Added import preview and diff with explicit confirmation.
+- Added a per-character configuration backup before import, with manual save and restore.
+- Kept schema 5 and existing context/automation behavior.
+
 ## 2.1.0 - 2026-09-11
 
 - Refreshed main navigation with native WoW icons.

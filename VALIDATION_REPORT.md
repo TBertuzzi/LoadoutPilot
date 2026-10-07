@@ -1,45 +1,30 @@
-# Validation Report - Loadout Pilot 2.1.0
+# Validation report — Loadout Pilot 2.2.0 Release
 
-Date: 2026-09-11
-Target: World of Warcraft Retail / Midnight 12.1.0
-Interface: 120100
-Version: 2.1.0
-SavedVariables schema: 5
+Date: 2026-10-07
+Source: user-provided `LoadoutPilot-main.zip` (2.1.0 baseline). No repository was modified.
+Target: WoW Retail / Interface 120100. SavedVariables schema 5.
 
-## Release validation
+## Completed locally
 
-- Static source validation: PASS
-- Lua syntax validation for Localization.lua, Data.lua, Core.lua, and tests/smoke.lua: PASS
-- Full smoke/regression suite: PASS
-- 2.1 UI/navigation marker validation: PASS
-- Configuration Health regression coverage: PASS
-- World / Delve / Dungeon / Mythic+ / Raid / PvP context regression coverage: PASS
-- Lair -> Raid context regression: PASS
-- Completed-Delve reward-phase retention: PASS
-- Unified Dungeon/M0/Mythic+ override regression: PASS
-- Raid Boss Loot Spec rule regression: PASS
-- AUTO / NOTIFY / OFF regression: PASS
-- Role-safety regression: PASS
-- Import/export regression: PASS
-- Combat-safe queue/retry regression: PASS
-- Loot Spec restoration regression: PASS
-- PvP -> World recovery regression: PASS
+| Check | Result |
+| --- | --- |
+| Lua syntax (`texluac -p` for Localization, Data, Core and smoke harness) | PASS |
+| Repository static validation (`python3 scripts/validate.py`) | PASS |
+| Mocked WoW API regression suite (`texlua tests/smoke.lua .`) | PASS |
+| Existing Delve reward-phase and Lair-to-Raid transitions | PASS in mock |
+| Dungeon and boss overrides, role protection, AUTO/NOTIFY/OFF, combat queues, PvP recovery | PASS in mock |
+| Read-only preview, cross-class/invalid rejection, changed-rule diff, confirmation reset | PASS in mock |
+| Automatic pre-import backup and restoration | PASS in mock |
+| Forbidden combat automation API checks | PASS |
 
-## 2.1 scope
+## Packaging
 
-- Refreshed main navigation with native WoW icons.
-- Added context icons for World, Delve, Dungeon, Mythic+, Raid, and PvP.
-- Added icons to the main Dungeon and Raid Boss actions.
-- Added Configuration Health for missing saved Blizzard talent loadouts and equipment sets.
-- SavedVariables schema remains 5; no migration is required.
-- Blizzard-native saved talent loadouts remain the talent source.
+- The release ZIP contains one `LoadoutPilot/` root with TOC, Lua files, media, changelog and license.
+- Source contains tests, scripts, documentation and the release notes, without repository history or transient build files.
+- Version metadata is 2.2.0 in TOC, Data and validator; schema is unchanged.
 
-## Live-client status
+## Live-client approval
 
-The 2.1.0 Test r1 UI was reviewed in the live client and approved for packaging. The stable 2.0.x context fixes carried into this release were previously live-tested, including Lair -> Raid -> World and completed Delve reward-phase behavior.
+The user reported extensive in-game testing and approved release on October 7, 2026. The captured Delve test recorded the detected context at 20:51:00 and talent completion at 20:51:06; the user confirmed the talent-switch bar appeared immediately. The subsequent World restoration was recorded at 20:51:27 after context detection at 20:51:22. The longer earlier Delve interval involved combat according to the user.
 
-## Package expectations
-
-- CurseForge/Release ZIP contains exactly one top-level `LoadoutPilot/` folder.
-- GitHub source ZIP contains one top-level `LoadoutPilot-v2.1.0/` folder.
-- Release metadata reports version 2.1.0 and Interface 120100.
+No runtime timing changes were introduced during release packaging. The Core, Data, Localization and media bytes match Test r1. Automated tests are mocked; user approval does not constitute exhaustive certification of every game state. These files are packaged for distribution and have not been uploaded to CurseForge or a repository by this session.

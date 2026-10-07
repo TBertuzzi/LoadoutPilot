@@ -1168,4 +1168,39 @@ assert(_G.LoadoutPilotMainFrame and _G.LoadoutPilotMainFrame.pages and _G.Loadou
 local healthLines = addon:GetConfigurationHealthLines()
 assert(type(healthLines) == "table" and #healthLines >= 6, "Configuration Health did not report the general contexts")
 
-print("Smoke test passed: Loadout Pilot 2.1.0 UI/health checks plus 2.0.2 regression coverage including Lair-to-Raid detection, completed-Delve reward-phase retention, unified dungeon overrides, raid boss Loot Spec rules, AUTO/NOTIFY/OFF, role safety, import/export, combat queues, loot restoration, and PvP exit recovery.")
+-- 2.2 preview is read-only; the UI requires a second, unchanged click.
+local before = addon:ExportConfiguration()
+local valid, summary = addon:PreviewConfiguration(before)
+assert(valid and summary:find("+0 / ~0 / -0", 1, true), "identical import preview should have no diff")
+local bad, badMessage = addon:PreviewConfiguration("LP2|1|8|MAGE\nBOGUS|1|2")
+assert(not bad and badMessage, "malformed import was accepted")
+assert(addon:ExportConfiguration() == before, "preview mutated the current configuration")
+local otherClass, classMessage = addon:PreviewConfiguration(before:gsub("^(LP2|1|)%d+", "%1999", 1))
+assert(not otherClass and classMessage, "cross-class configuration was accepted")
+local oldWorld = LoadoutPilotDB.specBindings.world
+LoadoutPilotDB.specBindings.world = {specID=(oldWorld and oldWorld.specID == 62) and 64 or 62, name="Alternate"}
+local changedOk, changedSummary = addon:PreviewConfiguration(before)
+assert(changedOk and changedSummary:find(oldWorld and "~1" or "+1", 1, true), "preview did not show a changed rule: " .. tostring(changedSummary))
+LoadoutPilotDB.specBindings.world = oldWorld
+
+local why = table.concat(addon:GetWhyLines(), "\n")
+assert(#why > 20, "switch diagnostics were empty")
+addon:ShowTransferFrame("import")
+local transfer = _G.LoadoutPilotTransferFrame
+transfer.edit:SetText(before)
+transfer.edit.scripts.OnTextChanged()
+transfer.import.scripts.OnClick()
+assert(transfer.previewText == before and transfer:IsShown(), "first click did not preview")
+transfer.edit:SetText(before .. "\nBOGUS|1")
+transfer.edit.scripts.OnTextChanged()
+assert(transfer.previewText == nil, "editing text did not clear import confirmation")
+transfer.edit:SetText(before)
+transfer.edit.scripts.OnTextChanged()
+transfer.import.scripts.OnClick()
+transfer.import.scripts.OnClick()
+assert(not transfer:IsShown() and LoadoutPilotDB.configBackup, "confirmed import did not save backup")
+LoadoutPilotDB.specBindings.world = { specID = 999, name = "Changed" }
+local restored, restoredMessage = addon:RestoreConfiguration()
+assert(restored and restoredMessage and LoadoutPilotDB.specBindings.world.specID ~= 999, "backup restore failed")
+
+print("Smoke test passed: Loadout Pilot 2.2.0 UI/health checks plus 2.0.2 regression coverage including Lair-to-Raid detection, completed-Delve reward-phase retention, unified dungeon overrides, raid boss Loot Spec rules, AUTO/NOTIFY/OFF, role safety, import/export, combat queues, loot restoration, and PvP exit recovery.")

@@ -215,3 +215,12 @@ Recheck:
 - Verify World, Delve, Dungeon/Mythic+, Raid/Lair, and PvP context switching still behaves like 2.0.2.
 - Confirm completed Delves remain Delve until the player leaves.
 - Confirm Lairs use Raid and restore World after leaving.
+
+## 2.2.0 Test r1
+
+- Preview an import and check added/changed/removed counts before confirming. Edit the text after preview and verify confirmation resets.
+- Import, restore backup, and verify the prior rule and automation mode return.
+- Check `/lpilot why` in World, Delve, Dungeon, Mythic+, Raid, and PvP; verify combat, NOTIFY/OFF and assigned-role messages.
+- Review Configuration Health and use Contexts/Dungeons navigation to repair broken references.
+- Inspect the copied event history after changes.
+- Repeat Lair and completed-Delve transitions in the live client before publication.
